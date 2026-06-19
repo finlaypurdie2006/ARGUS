@@ -20,6 +20,8 @@ https://github.com/projectdiscovery/subfinder/releases/latest)
 
 Edit `config.yaml`: set `target`, `domain` (optional), `ports`, wordlist path.
 
+**Model:** defaults to `claude-haiku-4-5-20251001` (fast/cheap, fine for structured recon summarization). For deeper, more nuanced analysis, set `anthropic_model` to `claude-sonnet-4-6` in `config.yaml` — slower and pricier, but better at catching subtle CVE matches.
+
 ## Run
 
 ```bash
