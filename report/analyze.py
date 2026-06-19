@@ -3,7 +3,9 @@ import json
 import os
 from anthropic import Anthropic
 
-SYSTEM_PROMPT = """You are a security analyst. You will be given raw output from \
+SYSTEM_PROMPT = """You are a security analyst writing a reconnaissance report in the \
+style of a professional penetration-test findings report (executive summary, scope, \
+findings with evidence, prioritized remediation). You will be given raw output from \
 reconnaissance tools (nmap, whatweb, nikto, gobuster, subfinder) run against an \
 authorized target (the operator's own lab system).
 
@@ -11,21 +13,42 @@ Analyze the output and respond with ONLY valid JSON (no markdown fences, no prea
 matching this exact schema:
 
 {
-  "summary": "2-4 sentence executive summary",
+  "summary": "3-5 sentence executive summary: what was tested, overall risk posture, business impact in plain language",
   "risk_level": "Low|Medium|High|Critical",
-  "open_ports": [{"port": "string", "service": "string", "version": "string", "note": "string"}],
+  "open_ports": [
+    {
+      "port": "string",
+      "service": "string",
+      "version": "string",
+      "note": "1 sentence on why this port/service matters from a security standpoint"
+    }
+  ],
   "findings": [
     {
       "title": "string",
       "severity": "Info|Low|Medium|High|Critical",
-      "description": "string",
+      "description": "2-4 sentences: what was found and the practical risk it poses",
       "evidence": "short relevant excerpt from tool output",
-      "recommendation": "string"
+      "cve": "CVE ID if the version/banner clearly matches a known CVE, else empty string",
+      "recommendation": "1-2 sentence immediate fix for this specific finding"
     }
   ],
   "subdomains": ["list of discovered subdomains, empty if none"],
-  "directories": ["list of discovered web paths, empty if none"]
+  "directories": ["list of discovered web paths, empty if none"],
+  "remediation_plan": [
+    {
+      "priority": "Immediate|Short-term|Long-term",
+      "action": "short imperative action title, e.g. 'Patch OpenSSH to latest stable'",
+      "detail": "3-5 sentences of concrete remediation guidance: how to fix it, why it matters, and any relevant hardening standard or best practice to follow"
+    }
+  ]
 }
+
+Guidance for remediation_plan: consolidate root causes across all findings rather than \
+repeating each finding 1:1. "Immediate" = fixes for Critical/High findings with a clear \
+exploit path. "Short-term" = Medium findings and quick hardening wins. "Long-term" = \
+process/architecture improvements (patch management, monitoring, segmentation, etc.) \
+that reduce recurrence. Order remediation_plan by priority (Immediate first).
 
 Base every finding strictly on the provided tool output. Do not invent results. \
 If a tool produced no output or errored, do not fabricate findings for it."""
@@ -62,8 +85,10 @@ def analyze(recon_data: dict, model: str = "claude-sonnet-4-6") -> dict:
                 "severity": "Info",
                 "description": text[:2000],
                 "evidence": "",
+                "cve": "",
                 "recommendation": "Re-run analysis or inspect raw recon data manually.",
             }],
             "subdomains": [],
             "directories": [],
+            "remediation_plan": [],
         }
