@@ -1,4 +1,4 @@
-# ARGUS
+# ARGUS - Automated Reconnaissance, Graphing & Unified Scanner
 
 Automated recon → Claude analysis → PDF report.
 
