@@ -1,0 +1,13 @@
+target: "192.168.1.10"          # IP or hostname — must be a system you own/control
+domain: ""                      # optional, for subfinder/web recon (leave blank if N/A)
+ports: "1-1000"                 # nmap port range
+output_dir: "output"
+anthropic_model: "claude-sonnet-4-6"
+
+tools:
+  nmap: "nmap"
+  subfinder: "subfinder"
+  whatweb: "whatweb"
+  nikto: "nikto"
+  gobuster: "gobuster"
+  wordlist: "/usr/share/wordlists/dirb/common.txt"
