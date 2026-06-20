@@ -39,6 +39,18 @@ python3 main.py
 python3 main.py --skip-web
 ```
 
+Before scanning, you'll be prompted:
+```
+Scan all 65535 ports instead of the configured range (1-1000)? [y/N]:
+```
+Answer `y` for a full port sweep (slower), or just press Enter to use the range from `config.yaml`.
+For automation/cron, skip the prompt entirely with `--all-ports`:
+```bash
+python3 main.py --all-ports
+```
+
+nmap runs with `-T4` (aggressive timing) by default.
+
 ## Output
 
 - `output/raw_recon.json` — raw tool output

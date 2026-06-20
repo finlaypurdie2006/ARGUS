@@ -46,6 +46,8 @@ def main():
     parser = argparse.ArgumentParser(description="ARGUS — automated recon + Claude-generated reports")
     parser.add_argument("--config", default="config.yaml", help="Path to config.yaml")
     parser.add_argument("--skip-web", action="store_true", help="Skip web recon (whatweb/nikto/gobuster/subfinder/TLS/headers)")
+    parser.add_argument("--all-ports", action="store_true",
+                         help="Scan all 65535 ports without prompting (overrides ports in config.yaml; useful for cron/automation)")
     args = parser.parse_args()
 
     print_banner()
@@ -53,7 +55,21 @@ def main():
     cfg = load_config(args.config)
     target = cfg["target"]
     domain = cfg.get("domain", "")
-    ports = cfg.get("ports", "1-65535")
+    ports = cfg.get("ports", "1-1000")
+    if args.all_ports:
+        ports = "1-65535"
+        print(f"[*] Scanning all 65535 ports (--all-ports flag set)\n")
+    else:
+        try:
+            answer = input(f"Scan all 65535 ports instead of the configured range ({ports})? [y/N]: ").strip().lower()
+        except EOFError:
+            answer = "n"
+        if answer in ("y", "yes"):
+            ports = "1-65535"
+            print("[*] Scanning all 65535 ports — this will take significantly longer than the default range.\n")
+        else:
+            print(f"[*] Using configured port range: {ports}\n")
+
     tools = cfg.get("tools", {})
     output_dir = cfg.get("output_dir", "output")
     ssl_port = cfg.get("ssl_port", 443)

@@ -10,7 +10,7 @@ def run_nmap(target: str, ports: str, nmap_bin: str = "nmap") -> dict:
     with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
         xml_path = tmp.name
 
-    cmd = [nmap_bin, "-sV", "-sC", "-p", ports, "-oX", xml_path, target]
+    cmd = [nmap_bin, "-sV", "-sC", "-T4", "-p", ports, "-oX", xml_path, target]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
 
     result = {
