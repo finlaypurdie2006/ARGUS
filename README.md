@@ -6,10 +6,19 @@ Automated recon → Claude analysis → PDF report.
 
 ## Setup
 
+Recommended: use a virtual environment to keep dependencies isolated from your system Python.
+
 ```bash
+cd argus
+python3 -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 export ANTHROPIC_API_KEY="your-key-here"
 ```
+
+Next time you come back, just `source venv/bin/activate` again before running `main.py` — no need to reinstall. To leave the environment: `deactivate`.
+
+(Without venv, you can also just run `pip install -r requirements.txt` directly.)
 
 Install recon tools (Kali/Debian):
 ```bash
