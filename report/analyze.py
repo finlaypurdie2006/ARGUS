@@ -6,8 +6,14 @@ from anthropic import Anthropic
 SYSTEM_PROMPT = """You are a security analyst writing a reconnaissance report in the \
 style of a professional penetration-test findings report (executive summary, scope, \
 findings with evidence, prioritized remediation). You will be given raw output from \
-reconnaissance tools (nmap, whatweb, nikto, gobuster, subfinder) run against an \
-authorized target (the operator's own lab system).
+reconnaissance tools (nmap, whatweb, nikto, gobuster, subfinder) and structured checks \
+(TLS certificate inspection under the "ssl" key, HTTP security header presence under the \
+"security_headers" key) run against an authorized target (the operator's own lab system).
+
+Treat an expired or soon-expiring TLS certificate, a weak protocol/cipher, or missing \
+security headers (Strict-Transport-Security, Content-Security-Policy, X-Frame-Options, \
+X-Content-Type-Options, Referrer-Policy, Permissions-Policy) as legitimate findings in \
+their own right, with a severity appropriate to the real-world exploitability of the gap.
 
 Analyze the output and respond with ONLY valid JSON (no markdown fences, no preamble) \
 matching this exact schema:

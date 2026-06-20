@@ -63,7 +63,8 @@ def _wrapped_table(data, col_widths, styles, header=True):
     return t
 
 
-def build_pdf(findings: dict, target: str, output_path: str, scan_meta: dict = None) -> str:
+def build_pdf(findings: dict, target: str, output_path: str, scan_meta: dict = None,
+               ssl_info: dict = None, headers_info: dict = None, diff: dict = None) -> str:
     scan_meta = scan_meta or {}
     styles = _styles()
     doc = SimpleDocTemplate(
@@ -91,6 +92,34 @@ def build_pdf(findings: dict, target: str, output_path: str, scan_meta: dict = N
     story.append(Paragraph("Executive Summary", styles["Heading2"]))
     story.append(Paragraph(findings.get("summary", "N/A"), styles["Normal"]))
     story.append(Spacer(1, 14))
+
+    # ---------- Changes since last scan ----------
+    if diff:
+        story.append(Paragraph("Changes Since Last Scan", styles["Heading2"]))
+        story.append(Paragraph(
+            f"Previous risk: <b>{diff.get('previous_risk_level')}</b> &rarr; "
+            f"Current risk: <b>{diff.get('current_risk_level')}</b>", styles["Normal"]))
+        new_f = diff.get("new_findings", [])
+        resolved_f = diff.get("resolved_findings", [])
+        changed = diff.get("severity_changes", [])
+        if new_f:
+            story.append(Spacer(1, 4))
+            story.append(Paragraph("<font color='#b91c1c'><b>New findings:</b></font>", styles["Normal"]))
+            for nf in new_f:
+                story.append(Paragraph(f"• [{nf.get('severity')}] {nf.get('title')}", styles["Normal"]))
+        if resolved_f:
+            story.append(Spacer(1, 4))
+            story.append(Paragraph("<font color='#15803d'><b>Resolved since last scan:</b></font>", styles["Normal"]))
+            for rf in resolved_f:
+                story.append(Paragraph(f"• {rf.get('title')}", styles["Normal"]))
+        if changed:
+            story.append(Spacer(1, 4))
+            story.append(Paragraph("<b>Severity changes:</b>", styles["Normal"]))
+            for c in changed:
+                story.append(Paragraph(f"• {c.get('title')}: {c.get('from')} → {c.get('to')}", styles["Normal"]))
+        if not (new_f or resolved_f or changed):
+            story.append(Paragraph("No changes from the previous scan.", styles["Small"]))
+        story.append(Spacer(1, 14))
 
     # ---------- Findings-at-a-glance ----------
     all_findings = findings.get("findings", [])
@@ -137,6 +166,47 @@ def build_pdf(findings: dict, target: str, output_path: str, scan_meta: dict = N
             data.append([p.get("port", ""), p.get("service", ""), p.get("version", ""), p.get("note", "")])
         col_widths = [PAGE_WIDTH * 0.10, PAGE_WIDTH * 0.18, PAGE_WIDTH * 0.27, PAGE_WIDTH * 0.45]
         story.append(_wrapped_table(data, col_widths, styles))
+        story.append(Spacer(1, 14))
+
+    # ---------- TLS / certificate ----------
+    if ssl_info:
+        story.append(Paragraph("TLS / Certificate", styles["Heading2"]))
+        if ssl_info.get("error"):
+            story.append(Paragraph(ssl_info["error"], styles["Small"]))
+        else:
+            rows = [
+                ["Protocol", ssl_info.get("protocol", "")],
+                ["Cipher", ssl_info.get("cipher", "")],
+                ["Subject CN", (ssl_info.get("subject") or {}).get("commonName", "")],
+                ["Issuer CN", (ssl_info.get("issuer") or {}).get("commonName", "")],
+                ["Valid from", ssl_info.get("not_before", "")],
+                ["Valid until", ssl_info.get("not_after", "")],
+                ["Days until expiry", str(ssl_info.get("days_until_expiry", ""))],
+                ["Expired", str(ssl_info.get("expired", ""))],
+            ]
+            story.append(_wrapped_table(rows, [PAGE_WIDTH * 0.3, PAGE_WIDTH * 0.7], styles, header=False))
+        story.append(Spacer(1, 14))
+
+    # ---------- HTTP security headers ----------
+    if headers_info:
+        story.append(Paragraph("HTTP Security Headers", styles["Heading2"]))
+        if headers_info.get("error"):
+            story.append(Paragraph(headers_info["error"], styles["Small"]))
+        else:
+            story.append(Paragraph(
+                f"Checked {headers_info.get('scheme')}://{target}:{headers_info.get('port')}/ "
+                f"— status {headers_info.get('status_code')}", styles["Small"]))
+            story.append(Spacer(1, 4))
+            present = headers_info.get("present_headers", {})
+            missing = headers_info.get("missing_headers", [])
+            if present:
+                rows = [["Header", "Value"]] + [[k, v] for k, v in present.items()]
+                story.append(_wrapped_table(rows, [PAGE_WIDTH * 0.35, PAGE_WIDTH * 0.65], styles))
+                story.append(Spacer(1, 6))
+            if missing:
+                story.append(Paragraph("<font color='#b91c1c'><b>Missing recommended headers:</b></font>", styles["Normal"]))
+                for h in missing:
+                    story.append(Paragraph(f"• {h}", styles["Normal"]))
         story.append(Spacer(1, 14))
 
     # ---------- Subdomains / directories ----------

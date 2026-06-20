@@ -1,5 +1,6 @@
 """Terminal UI helpers: banner + progress bar."""
 import sys
+import threading
 
 BANNER = r"""    ___    ____  ________  _______
    /   |  / __ \/ ____/ / / / ___/
@@ -15,20 +16,23 @@ def print_banner():
 
 
 class ProgressBar:
-    """Simple in-place terminal progress bar, advanced one step at a time."""
+    """Simple in-place terminal progress bar. Thread-safe — safe to call .update()
+    from multiple worker threads running scans in parallel."""
 
     def __init__(self, total: int, width: int = 32):
         self.total = max(total, 1)
         self.current = 0
         self.width = width
+        self._lock = threading.Lock()
         self._render("starting...")
 
     def update(self, label: str = ""):
-        self.current += 1
-        self._render(label)
-        if self.current >= self.total:
-            sys.stdout.write("\n")
-            sys.stdout.flush()
+        with self._lock:
+            self.current += 1
+            self._render(label)
+            if self.current >= self.total:
+                sys.stdout.write("\n")
+                sys.stdout.flush()
 
     def _render(self, label: str):
         frac = min(self.current / self.total, 1.0)
