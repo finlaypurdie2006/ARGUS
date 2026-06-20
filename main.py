@@ -20,7 +20,11 @@ from report.analyze import analyze
 from report.pdf_gen import build_pdf
 from report.html_gen import build_html
 from report.diff import find_previous_run, load_findings, compute_diff
-from ui import print_banner, ProgressBar
+from report.history import list_runs
+from report.index_gen import build_index
+from preflight import check_tools
+from setup_wizard import run_init_wizard
+from ui import print_banner, ProgressBar, print_run_summary, print_history, try_open
 
 LABELS = {
     "nmap": "nmap: service/version scan",
@@ -31,6 +35,8 @@ LABELS = {
     "ssl_cert": "TLS: certificate inspection",
     "security_headers": "HTTP: security header check",
 }
+BINARY_BACKED = {"nmap", "subfinder", "whatweb", "nikto", "gobuster"}
+PLACEHOLDER_TARGET = "192.168.1.10"
 
 
 def load_config(path: str) -> dict:
@@ -42,23 +48,90 @@ def slugify(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", value).strip("_") or "target"
 
 
+def vprint(quiet: bool, *a, **kw):
+    if not quiet:
+        print(*a, **kw)
+
+
+def describe_commands(target, ports, domain, tools, ssl_port, skip_web) -> list:
+    """Build the exact command strings that would run — used by --dry-run."""
+    cmds = [("nmap", f"{tools.get('nmap', 'nmap')} -sV -sC -T4 -p {ports} {target}")]
+    if not skip_web:
+        cmds.append(("subfinder",
+                     f"{tools.get('subfinder', 'subfinder')} -d {domain} -silent" if domain
+                     else "(skipped — no domain configured)"))
+        cmds.append(("whatweb", f"{tools.get('whatweb', 'whatweb')} -a 3 {target}"))
+        cmds.append(("nikto", f"{tools.get('nikto', 'nikto')} -h {target}"))
+        cmds.append(("gobuster",
+                     f"{tools.get('gobuster', 'gobuster')} dir -u http://{target} "
+                     f"-w {tools.get('wordlist', '/usr/share/wordlists/dirb/common.txt')} -q"))
+        cmds.append(("ssl_cert", f"TLS handshake inspection on {target}:{ssl_port}"))
+        cmds.append(("security_headers", f"GET https://{target}/ (falls back to http) — security header check"))
+    return cmds
+
+
 def main():
     parser = argparse.ArgumentParser(description="ARGUS — automated recon + Claude-generated reports")
     parser.add_argument("--config", default="config.yaml", help="Path to config.yaml")
     parser.add_argument("--skip-web", action="store_true", help="Skip web recon (whatweb/nikto/gobuster/subfinder/TLS/headers)")
     parser.add_argument("--all-ports", action="store_true",
-                         help="Scan all 65535 ports without prompting (overrides ports in config.yaml; useful for cron/automation)")
+                         help="Scan all 65535 ports without prompting (overrides ports in config.yaml)")
+    parser.add_argument("--quiet", action="store_true", help="Suppress per-tool chatter; show only the progress bar + final summary")
+    parser.add_argument("--open", action="store_true", help="Open the HTML report automatically when done")
+    parser.add_argument("--yes", action="store_true", help="Skip the authorization confirmation prompt (for automation)")
+    parser.add_argument("--dry-run", action="store_true", help="Print the commands that would run, without running them")
+    parser.add_argument("--init", action="store_true", help="Interactively create config.yaml and exit")
+    parser.add_argument("--history", action="store_true", help="List past runs + risk trend for this target and exit")
     args = parser.parse_args()
 
-    print_banner()
+    if args.init:
+        run_init_wizard(args.config)
+        return
 
+    print_banner()
     cfg = load_config(args.config)
     target = cfg["target"]
     domain = cfg.get("domain", "")
+    tools = cfg.get("tools", {})
+    output_dir = cfg.get("output_dir", "output")
+    ssl_port = cfg.get("ssl_port", 443)
+    target_slug = slugify(target)
+
+    if args.history:
+        runs = list_runs(output_dir, target_slug)
+        print_history(runs, target)
+        return
+
+    if target == PLACEHOLDER_TARGET:
+        print(f"[!] Target is still the default placeholder ({PLACEHOLDER_TARGET}).")
+        print("    Edit config.yaml, or run: python3 main.py --init\n")
+        if not args.yes and not args.dry_run:
+            try:
+                cont = input("Continue anyway with this target? [y/N]: ").strip().lower()
+            except EOFError:
+                cont = "n"
+            if cont not in ("y", "yes"):
+                print("Aborted.")
+                return
+
+    if not args.yes and not args.dry_run:
+        print(f"You are about to scan: {target}")
+        try:
+            confirm = input("Confirm you own this system or have explicit authorization to test it. [y/N]: ").strip().lower()
+        except EOFError:
+            confirm = "n"
+        if confirm not in ("y", "yes"):
+            print("Aborted — authorization not confirmed.")
+            return
+    elif args.yes:
+        vprint(args.quiet, f"[*] --yes set: skipping authorization confirmation for {target}")
+
     ports = cfg.get("ports", "1-1000")
     if args.all_ports:
         ports = "1-65535"
-        print(f"[*] Scanning all 65535 ports (--all-ports flag set)\n")
+        vprint(args.quiet, "[*] Scanning all 65535 ports (--all-ports flag set)\n")
+    elif args.dry_run:
+        vprint(args.quiet, f"[*] Dry run — using configured port range: {ports}\n")
     else:
         try:
             answer = input(f"Scan all 65535 ports instead of the configured range ({ports})? [y/N]: ").strip().lower()
@@ -70,18 +143,28 @@ def main():
         else:
             print(f"[*] Using configured port range: {ports}\n")
 
-    tools = cfg.get("tools", {})
-    output_dir = cfg.get("output_dir", "output")
-    ssl_port = cfg.get("ssl_port", 443)
+    if args.dry_run:
+        print("Planned commands (dry run — nothing will execute):\n")
+        for name, cmd in describe_commands(target, ports, domain, tools, ssl_port, args.skip_web):
+            print(f"  [{name}] {cmd}")
+        print()
+        return
+
+    # ---------- preflight: warn about missing binaries before scanning ----------
+    binary_tasks = {"nmap"} | (set() if args.skip_web else {"subfinder", "whatweb", "nikto", "gobuster"})
+    binary_tools = {name: tools.get(name, name) for name in binary_tasks}
+    availability = check_tools(binary_tools, list(binary_tasks))
+    missing = [name for name, ok in availability.items() if not ok]
+    if missing:
+        vprint(args.quiet, f"[!] Missing tools (will be skipped automatically): {', '.join(missing)}\n")
 
     # ---------- timestamped, per-target run folder ----------
-    target_slug = slugify(target)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = os.path.join(output_dir, target_slug, timestamp)
     os.makedirs(run_dir, exist_ok=True)
 
-    print(f"\nTarget:  {target}")
-    print(f"Run dir: {run_dir}\n")
+    vprint(args.quiet, f"Target:  {target}")
+    vprint(args.quiet, f"Run dir: {run_dir}\n")
 
     # ---------- build task list (runs in parallel) ----------
     tasks = {"nmap": lambda: run_nmap(target, ports, tools.get("nmap", "nmap"))}
@@ -113,7 +196,7 @@ def main():
     network_result = results.pop("nmap", {})
     ssl_result = results.pop("ssl_cert", None)
     headers_result = results.pop("security_headers", None)
-    web_results = results  # whatever's left: subfinder/whatweb/nikto/gobuster
+    web_results = results
 
     recon_data = {"network": network_result, "web": web_results}
     if ssl_result is not None:
@@ -136,7 +219,6 @@ def main():
     with open(findings_path, "w") as f:
         json.dump(findings, f, indent=2)
 
-    # ---------- diff against most recent previous run for this target ----------
     progress.update("Comparing to previous run")
     diff = None
     prev_run_dir = find_previous_run(output_dir, target_slug, run_dir)
@@ -173,6 +255,8 @@ def main():
     build_html(findings, target, html_path, scan_meta=scan_meta,
                ssl_info=ssl_result, headers_info=headers_result, diff=diff)
 
+    index_path = build_index(run_dir, target, timestamp, findings.get("risk_level", "Unknown"))
+
     # convenience "latest" symlink (best-effort, skip silently if unsupported)
     latest_link = os.path.join(output_dir, target_slug, "latest")
     try:
@@ -182,12 +266,18 @@ def main():
     except OSError:
         pass
 
-    print(f"\n[+] Raw data:  {raw_path}")
-    print(f"[+] Findings:  {findings_path}")
-    print(f"[+] PDF:       {pdf_path}")
-    print(f"[+] HTML:      {html_path}")
+    vprint(args.quiet, f"\n[+] Raw data:  {raw_path}")
+    vprint(args.quiet, f"[+] Findings:  {findings_path}")
+    vprint(args.quiet, f"[+] PDF:       {pdf_path}")
+    vprint(args.quiet, f"[+] HTML:      {html_path}")
+    vprint(args.quiet, f"[+] Index:     {index_path}")
     if diff:
-        print(f"[+] Diff vs:   {prev_run_dir}")
+        vprint(args.quiet, f"[+] Diff vs:   {prev_run_dir}")
+
+    print_run_summary(findings)
+
+    if args.open:
+        try_open(html_path)
 
 
 if __name__ == "__main__":

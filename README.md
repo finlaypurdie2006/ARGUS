@@ -34,35 +34,56 @@ Edit `config.yaml`: set `target`, `domain` (optional), `ports`, wordlist path.
 ## Run
 
 ```bash
+# first time only — interactively generate config.yaml
+python3 main.py --init
+
+# normal run
 python3 main.py
-# or, network-only:
-python3 main.py --skip-web
 ```
 
-Before scanning, you'll be prompted:
+Before scanning, you'll be asked to confirm authorization, then prompted on port range:
 ```
+You are about to scan: 10.0.0.5
+Confirm you own this system or have explicit authorization to test it. [y/N]: y
 Scan all 65535 ports instead of the configured range (1-1000)? [y/N]:
 ```
-Answer `y` for a full port sweep (slower), or just press Enter to use the range from `config.yaml`.
-For automation/cron, skip the prompt entirely with `--all-ports`:
-```bash
-python3 main.py --all-ports
-```
+
+**Flags**
+
+| Flag | What it does |
+|---|---|
+| `--skip-web` | Network recon only (skip whatweb/nikto/gobuster/subfinder/TLS/headers) |
+| `--all-ports` | Scan all 65535 ports, skipping the port-range prompt |
+| `--yes` | Skip the authorization confirmation prompt (for automation/cron) |
+| `--dry-run` | Print the exact commands that would run, without running them |
+| `--quiet` | Suppress per-tool chatter; show only the progress bar + final summary |
+| `--open` | Auto-open the HTML report when the run finishes |
+| `--init` | Interactive wizard to create `config.yaml` |
+| `--history` | List past runs for this target with risk-level trend, then exit |
 
 nmap runs with `-T4` (aggressive timing) by default.
 
 ## Output
 
-- `output/raw_recon.json` — raw tool output
-- `output/findings.json` — Claude's structured analysis
-- `output/recon_report.pdf` — final report
+Each run gets its own timestamped folder: `output/<target>/<YYYYMMDD_HHMMSS>/`
+
+- `raw_recon.json` — raw tool output
+- `findings.json` — Claude's structured analysis
+- `recon_report.pdf` / `recon_report.html` — full reports
+- `index.html` — quick links to everything above
+- A colored risk/severity summary also prints to the terminal at the end of each run.
+
+If a previous run exists for the same target, the new report includes a **Changes Since Last Scan** section (new findings, resolved findings, severity changes). Use `--history` to see the risk trend across all runs for a target.
 
 ## Pipeline
 
-1. `recon/network.py` runs `nmap -sV -sC`, parses XML.
+1. `recon/network.py` runs `nmap -sV -sC -T4`, parses XML.
 2. `recon/web.py` runs subfinder, whatweb, nikto, gobuster.
-3. `report/analyze.py` sends raw output to Claude, gets structured JSON findings.
-4. `report/pdf_gen.py` renders findings into a PDF.
+3. `recon/ssl_headers.py` inspects the TLS certificate and checks HTTP security headers (pure Python, no extra binaries).
+4. All of the above run in parallel via a thread pool.
+5. `report/analyze.py` sends raw output to Claude, gets back structured JSON findings + a prioritized remediation plan.
+6. `report/diff.py` compares against the most recent previous run for the target.
+7. `report/pdf_gen.py` / `report/html_gen.py` render the final reports.
 
 ## Notes
 

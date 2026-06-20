@@ -2,6 +2,28 @@
 
 All notable changes to ARGUS are documented in this file.
 
+## [0.3.0] - testing branch
+
+### Added
+- Parallel scan execution — nmap, web tools, TLS check, and header check all run concurrently via a thread pool (previously sequential)
+- `recon/ssl_headers.py` — pure-Python TLS certificate inspection and HTTP security header checks (no extra binaries needed)
+- HTML report (`recon_report.html`) alongside the PDF, same content/sections
+- Timestamped, per-target output folders: `output/<target>/<YYYYMMDD_HHMMSS>/`, with a `latest` symlink
+- `report/diff.py` — compares each run against the most recent previous run for the same target; PDF/HTML now show a **Changes Since Last Scan** section
+- `--history` flag — lists past runs for a target with risk-level trend
+- `--init` flag — interactive wizard that writes `config.yaml` for you
+- `--dry-run` flag — prints the exact commands that would run without executing them
+- `--all-ports` flag and an interactive y/n prompt — full 65535-port scan is opt-in, not default
+- `--yes` flag — skips the authorization confirmation prompt for automation/cron
+- `--quiet` flag — suppresses per-tool chatter, keeping just the progress bar + summary
+- `--open` flag — auto-opens the HTML report when the run finishes
+- Authorization confirmation prompt before any scan runs ("you're about to scan X — confirm authorized")
+- Friendlier warning if `target` in config.yaml is still the default placeholder IP
+- `preflight.py` — checks which configured recon binaries are actually installed before scanning, warns about missing ones upfront
+- Colored end-of-run terminal summary (`ui.print_run_summary`) — overall risk + severity counts + top issues
+- `report/index_gen.py` — per-run `index.html` linking the PDF, HTML, and raw JSON outputs
+- nmap now runs with `-T4` (aggressive timing) by default
+
 ## [0.2.0] - testing branch
 
 ### Added
