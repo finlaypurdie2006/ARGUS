@@ -53,7 +53,7 @@ def main():
     cfg = load_config(args.config)
     target = cfg["target"]
     domain = cfg.get("domain", "")
-    ports = cfg.get("ports", "1-1000")
+    ports = cfg.get("ports", "1-65535")
     tools = cfg.get("tools", {})
     output_dir = cfg.get("output_dir", "output")
     ssl_port = cfg.get("ssl_port", 443)

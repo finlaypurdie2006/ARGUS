@@ -1,6 +1,6 @@
 target: "192.168.1.10"          # IP or hostname — must be a system you own/control
 domain: ""                      # optional, for subfinder/web recon (leave blank if N/A)
-ports: "1-1000"                 # nmap port range
+ports: "1-65535"                # nmap port range (all ports — slower than a top-1000 scan)
 output_dir: "output"
 anthropic_model: "claude-sonnet-4-6"  # best analysis quality; set to "claude-haiku-4-5-20251001" for faster/cheaper runs
 
