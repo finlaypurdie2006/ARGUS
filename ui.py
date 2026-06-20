@@ -9,11 +9,14 @@ BANNER = r"""    ___    ____  ________  _______
   / /| | / /_/ / / __/ / / /\__ \ 
  / ___ |/ _, _/ /_/ / /_/ /___/ / 
 /_/  |_/_/ |_|\____/\____//____/  
-        automated recon + report
 """
+TAGLINE = "Automated Reconnaissance, Graphing & Unified Scanner"
+DISCLAIMER = "Use responsibly — only scan systems you own or have explicit authorization to test."
+CREDIT = "made by @finp2006 on github"
 
 RESET = "\033[0m"
 BOLD = "\033[1m"
+GREEN = "\033[92m"
 SEVERITY_ANSI = {
     "Critical": "\033[1;91m",  # bold bright red
     "High": "\033[91m",        # bright red
@@ -37,7 +40,16 @@ def colorize(text: str, severity: str) -> str:
 
 
 def print_banner():
-    print(BANNER)
+    if _color_enabled():
+        print(f"{GREEN}{BANNER}")
+        print(f"        {TAGLINE}{RESET}")
+        print(f"\n  {DISCLAIMER}")
+        print(f"  {CREDIT}\n")
+    else:
+        print(BANNER)
+        print(f"        {TAGLINE}")
+        print(f"\n  {DISCLAIMER}")
+        print(f"  {CREDIT}\n")
 
 
 class ProgressBar:
