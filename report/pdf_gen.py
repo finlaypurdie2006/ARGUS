@@ -5,21 +5,15 @@ from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, HRFlowable
 )
 
-SEVERITY_COLORS = {
-    "Critical": colors.HexColor("#7f1d1d"),
-    "High": colors.HexColor("#b91c1c"),
-    "Medium": colors.HexColor("#b45309"),
-    "Low": colors.HexColor("#1d4ed8"),
-    "Info": colors.HexColor("#6b7280"),
-    "Unknown": colors.HexColor("#6b7280"),
-}
-SEVERITY_ORDER = ["Critical", "High", "Medium", "Low", "Info"]
-PRIORITY_ORDER = ["Immediate", "Short-term", "Long-term"]
+from report.common import SEVERITY_HEX, SEVERITY_ORDER, PRIORITY_ORDER, sort_by_severity, sort_plan_by_priority
+
+# reportlab needs actual Color objects, not hex strings — derive them once from the
+# shared hex source so PDF and HTML can't drift out of sync on severity colors.
+SEVERITY_COLORS = {sev: colors.HexColor(hex_val) for sev, hex_val in SEVERITY_HEX.items()}
 
 PAGE_MARGIN = 40
 PAGE_WIDTH = letter[0] - 2 * PAGE_MARGIN  # usable width
@@ -237,8 +231,7 @@ def build_pdf(findings: dict, target: str, output_path: str, scan_meta: dict = N
     if not all_findings:
         story.append(Paragraph("No findings were reported for this scan.", styles["Normal"]))
 
-    for f in sorted(all_findings, key=lambda x: SEVERITY_ORDER.index(x.get("severity", "Info"))
-                     if x.get("severity") in SEVERITY_ORDER else len(SEVERITY_ORDER)):
+    for f in sort_by_severity(all_findings):
         sev = f.get("severity", "Info")
         sev_color = SEVERITY_COLORS.get(sev, colors.black)
         header = f"<font color='{sev_color.hexval()}'><b>[{sev}]</b></font> {f.get('title','')}"
@@ -267,11 +260,7 @@ def build_pdf(findings: dict, target: str, output_path: str, scan_meta: dict = N
             styles["SectionIntro"]))
         story.append(Spacer(1, 10))
 
-        plan_sorted = sorted(
-            plan,
-            key=lambda x: PRIORITY_ORDER.index(x.get("priority", "Long-term"))
-            if x.get("priority") in PRIORITY_ORDER else len(PRIORITY_ORDER)
-        )
+        plan_sorted = sort_plan_by_priority(plan)
         for priority in PRIORITY_ORDER:
             items = [p for p in plan_sorted if p.get("priority") == priority]
             if not items:

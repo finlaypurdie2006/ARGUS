@@ -2,10 +2,7 @@
 so you don't have to hunt through the run folder to find what you want."""
 import os
 
-SEVERITY_COLORS = {
-    "Critical": "#7f1d1d", "High": "#b91c1c", "Medium": "#b45309",
-    "Low": "#1d4ed8", "Info": "#6b7280", "Unknown": "#6b7280",
-}
+from report.common import SEVERITY_HEX as SEVERITY_COLORS
 
 
 def build_index(run_dir: str, target: str, timestamp: str, risk_level: str) -> str:

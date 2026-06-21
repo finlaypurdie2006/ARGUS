@@ -15,15 +15,25 @@ All notable changes to ARGUS are documented in this file.
 - `--init` flag — interactive wizard that writes `config.yaml` for you
 - `--dry-run` flag — prints the exact commands that would run without executing them
 - `--all-ports` flag and an interactive y/n prompt — full 65535-port scan is opt-in, not default
-- `--yes` flag — skips the authorization confirmation prompt for automation/cron
+- `--yes` flag — skips the placeholder-target confirmation prompt for automation/cron
 - `--quiet` flag — suppresses per-tool chatter, keeping just the progress bar + summary
 - `--open` flag — auto-opens the HTML report when the run finishes
-- Authorization confirmation prompt before any scan runs ("you're about to scan X — confirm authorized")
 - Friendlier warning if `target` in config.yaml is still the default placeholder IP
 - `preflight.py` — checks which configured recon binaries are actually installed before scanning, warns about missing ones upfront
 - Colored end-of-run terminal summary (`ui.print_run_summary`) — overall risk + severity counts + top issues
 - `report/index_gen.py` — per-run `index.html` linking the PDF, HTML, and raw JSON outputs
 - nmap now runs with `-T4` (aggressive timing) by default
+- Green startup banner with tagline, responsible-use disclaimer, and credit line
+
+### Changed
+- `report/common.py` added as a shared module for severity colors/ordering and sort helpers — removes ~4 copy-pasted constant blocks and sort-key lambdas that had drifted across `pdf_gen.py`, `html_gen.py`, and `index_gen.py`
+- `recon/network.py` now catches missing-binary/timeout errors the same way `recon/web.py` already did, and always cleans up its temp XML file (previously leaked on any exception)
+- `recon/ssl_headers.py`: shared SSL-context helper instead of duplicating it twice; HTTP connections are now explicitly closed in a `finally` block (previously leaked a socket on a failed request)
+- `report/diff.py`: removed duplicate dict-building in `compute_diff` (was building 4 lookup dicts where 2 sufficed)
+- `report/analyze.py`: raised `max_tokens` 4000 → 8000 to account for the larger schema (attack_vector + remediation_plan); response now less likely to get cut off mid-JSON
+
+### Removed
+- Authorization confirmation prompt before scanning — the startup banner's disclaimer already covers this, so the redundant per-run prompt was removed
 
 ## [0.2.0] - testing branch
 

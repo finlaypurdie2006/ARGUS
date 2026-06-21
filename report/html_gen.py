@@ -3,16 +3,8 @@ import html as html_lib
 from collections import Counter
 from datetime import datetime
 
-SEVERITY_COLORS = {
-    "Critical": "#7f1d1d",
-    "High": "#b91c1c",
-    "Medium": "#b45309",
-    "Low": "#1d4ed8",
-    "Info": "#6b7280",
-    "Unknown": "#6b7280",
-}
-SEVERITY_ORDER = ["Critical", "High", "Medium", "Low", "Info"]
-PRIORITY_ORDER = ["Immediate", "Short-term", "Long-term"]
+from report.common import SEVERITY_HEX as SEVERITY_COLORS, SEVERITY_ORDER, PRIORITY_ORDER, \
+    sort_by_severity, sort_plan_by_priority
 
 CSS = """
 :root { color-scheme: light; }
@@ -179,10 +171,7 @@ def build_html(findings: dict, target: str, output_path: str, scan_meta: dict = 
     parts.append("<h2>Detailed Findings</h2>")
     if not all_findings:
         parts.append("<p>No findings were reported for this scan.</p>")
-    sorted_findings = sorted(
-        all_findings,
-        key=lambda x: SEVERITY_ORDER.index(x.get("severity", "Info")) if x.get("severity") in SEVERITY_ORDER else len(SEVERITY_ORDER)
-    )
+    sorted_findings = sort_by_severity(all_findings)
     for f in sorted_findings:
         sev = f.get("severity", "Info")
         color = SEVERITY_COLORS.get(sev, "#000")
@@ -201,8 +190,7 @@ def build_html(findings: dict, target: str, output_path: str, scan_meta: dict = 
     plan = findings.get("remediation_plan", [])
     if plan:
         parts.append("<h2>Remediation Plan</h2>")
-        plan_sorted = sorted(plan, key=lambda x: PRIORITY_ORDER.index(x.get("priority", "Long-term"))
-                              if x.get("priority") in PRIORITY_ORDER else len(PRIORITY_ORDER))
+        plan_sorted = sort_plan_by_priority(plan)
         for priority in PRIORITY_ORDER:
             items = [p for p in plan_sorted if p.get("priority") == priority]
             if not items:

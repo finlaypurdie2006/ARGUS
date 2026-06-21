@@ -41,10 +41,8 @@ python3 main.py --init
 python3 main.py
 ```
 
-Before scanning, you'll be asked to confirm authorization, then prompted on port range:
+Before scanning, you'll be prompted on port range (the startup banner already carries the responsible-use disclaimer):
 ```
-You are about to scan: 10.0.0.5
-Confirm you own this system or have explicit authorization to test it. [y/N]: y
 Scan all 65535 ports instead of the configured range (1-1000)? [y/N]:
 ```
 
@@ -54,7 +52,7 @@ Scan all 65535 ports instead of the configured range (1-1000)? [y/N]:
 |---|---|
 | `--skip-web` | Network recon only (skip whatweb/nikto/gobuster/subfinder/TLS/headers) |
 | `--all-ports` | Scan all 65535 ports, skipping the port-range prompt |
-| `--yes` | Skip the authorization confirmation prompt (for automation/cron) |
+| `--yes` | Skip the placeholder-target confirmation prompt (for automation/cron) |
 | `--dry-run` | Print the exact commands that would run, without running them |
 | `--quiet` | Suppress per-tool chatter; show only the progress bar + final summary |
 | `--open` | Auto-open the HTML report when the run finishes |

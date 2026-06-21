@@ -3,6 +3,9 @@ import os
 import sys
 import threading
 import webbrowser
+from collections import Counter
+
+from report.common import SEVERITY_ORDER  # single source of truth, shared with the PDF/HTML renderers
 
 BANNER = r"""    ___    ____  ________  _______
    /   |  / __ \/ ____/ / / / ___/
@@ -25,31 +28,30 @@ SEVERITY_ANSI = {
     "Info": "\033[90m",        # grey
     "Unknown": "\033[90m",
 }
-SEVERITY_ORDER = ["Critical", "High", "Medium", "Low", "Info"]
 
 
 def _color_enabled() -> bool:
     return sys.stdout.isatty()
 
 
-def colorize(text: str, severity: str) -> str:
+def colorize(text: str, severity: str, bold: bool = False) -> str:
+    """Wrap text in the ANSI color for a severity level. No-ops if stdout isn't a TTY
+    (e.g. piped to a file) or the severity isn't recognized."""
     if not _color_enabled():
         return text
     code = SEVERITY_ANSI.get(severity, "")
-    return f"{code}{text}{RESET}" if code else text
+    if not code:
+        return text
+    if bold:
+        code = BOLD + code  # stack bold on top of the severity color rather than nesting a second reset
+    return f"{code}{text}{RESET}"
 
 
 def print_banner():
-    if _color_enabled():
-        print(f"{GREEN}{BANNER}")
-        print(f"        {TAGLINE}{RESET}")
-        print(f"\n  {DISCLAIMER}")
-        print(f"  {CREDIT}\n")
-    else:
-        print(BANNER)
-        print(f"        {TAGLINE}")
-        print(f"\n  {DISCLAIMER}")
-        print(f"  {CREDIT}\n")
+    art_and_tagline = f"{BANNER}\n        {TAGLINE}"
+    print(f"{GREEN}{art_and_tagline}{RESET}" if _color_enabled() else art_and_tagline)
+    print(f"\n  {DISCLAIMER}")
+    print(f"  {CREDIT}\n")
 
 
 class ProgressBar:
@@ -84,19 +86,18 @@ class ProgressBar:
 
 def print_run_summary(findings: dict):
     """Colored end-of-run summary: overall risk + severity counts + top issues."""
+    all_findings = findings.get("findings", [])
     risk = findings.get("risk_level", "Unknown")
-    print("\n" + "=" * 50)
-    print(f"Overall Risk: {colorize(BOLD + risk + RESET if _color_enabled() else risk, risk)}")
 
-    counts = {}
-    for f in findings.get("findings", []):
-        sev = f.get("severity", "Info")
-        counts[sev] = counts.get(sev, 0) + 1
+    print("\n" + "=" * 50)
+    print(f"Overall Risk: {colorize(risk, risk, bold=True)}")
+
+    counts = Counter(f.get("severity", "Info") for f in all_findings)
     for sev in SEVERITY_ORDER:
         if counts.get(sev):
             print(f"  {colorize(sev, sev)}: {counts[sev]}")
 
-    top = [f for f in findings.get("findings", []) if f.get("severity") in ("Critical", "High")][:3]
+    top = [f for f in all_findings if f.get("severity") in ("Critical", "High")][:3]
     if top:
         print("\nTop issues:")
         for f in top:

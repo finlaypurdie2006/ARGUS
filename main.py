@@ -54,7 +54,13 @@ def vprint(quiet: bool, *a, **kw):
 
 
 def describe_commands(target, ports, domain, tools, ssl_port, skip_web) -> list:
-    """Build the exact command strings that would run — used by --dry-run."""
+    """Build the exact command strings that would run — used by --dry-run.
+
+    Note: these strings are deliberately kept in sync by hand with the real commands
+    built inside recon/network.py and recon/web.py (run_nmap, run_whatweb, etc).
+    --dry-run never calls those functions (the point is to preview without running
+    anything), so if you change a tool's flags there, update the matching line here too.
+    """
     cmds = [("nmap", f"{tools.get('nmap', 'nmap')} -sV -sC -T4 -p {ports} {target}")]
     if not skip_web:
         cmds.append(("subfinder",
@@ -78,7 +84,7 @@ def main():
                          help="Scan all 65535 ports without prompting (overrides ports in config.yaml)")
     parser.add_argument("--quiet", action="store_true", help="Suppress per-tool chatter; show only the progress bar + final summary")
     parser.add_argument("--open", action="store_true", help="Open the HTML report automatically when done")
-    parser.add_argument("--yes", action="store_true", help="Skip the authorization confirmation prompt (for automation)")
+    parser.add_argument("--yes", action="store_true", help="Skip the placeholder-target confirmation prompt (for automation)")
     parser.add_argument("--dry-run", action="store_true", help="Print the commands that would run, without running them")
     parser.add_argument("--init", action="store_true", help="Interactively create config.yaml and exit")
     parser.add_argument("--history", action="store_true", help="List past runs + risk trend for this target and exit")
@@ -114,18 +120,6 @@ def main():
                 print("Aborted.")
                 return
 
-    if not args.yes and not args.dry_run:
-        print(f"You are about to scan: {target}")
-        try:
-            confirm = input("Confirm you own this system or have explicit authorization to test it. [y/N]: ").strip().lower()
-        except EOFError:
-            confirm = "n"
-        if confirm not in ("y", "yes"):
-            print("Aborted — authorization not confirmed.")
-            return
-    elif args.yes:
-        vprint(args.quiet, f"[*] --yes set: skipping authorization confirmation for {target}")
-
     ports = cfg.get("ports", "1-1000")
     if args.all_ports:
         ports = "1-65535"
@@ -151,9 +145,9 @@ def main():
         return
 
     # ---------- preflight: warn about missing binaries before scanning ----------
-    binary_tasks = {"nmap"} | (set() if args.skip_web else {"subfinder", "whatweb", "nikto", "gobuster"})
+    binary_tasks = {"nmap"} if args.skip_web else BINARY_BACKED
     binary_tools = {name: tools.get(name, name) for name in binary_tasks}
-    availability = check_tools(binary_tools, list(binary_tasks))
+    availability = check_tools(binary_tools, list(binary_tools))
     missing = [name for name, ok in availability.items() if not ok]
     if missing:
         vprint(args.quiet, f"[!] Missing tools (will be skipped automatically): {', '.join(missing)}\n")
@@ -184,12 +178,19 @@ def main():
 
     results = {}
     with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+        # Each tool is independent (none reads another's output), so they all run
+        # concurrently instead of one-after-another. as_completed() yields futures in
+        # whatever order they actually finish — not submission order — which is why
+        # the progress bar label is looked up per-future via future_map rather than
+        # assumed from a fixed sequence.
         future_map = {executor.submit(fn): name for name, fn in tasks.items()}
         for future in as_completed(future_map):
             name = future_map[future]
             try:
                 results[name] = future.result()
             except Exception as e:
+                # A tool wrapper raising here (vs. returning a graceful {"error": ...}
+                # dict itself) shouldn't take down the whole run — record it and move on.
                 results[name] = {"error": str(e)}
             progress.update(LABELS.get(name, name))
 

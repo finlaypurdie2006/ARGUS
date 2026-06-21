@@ -73,16 +73,26 @@ def analyze(recon_data: dict, model: str = "claude-sonnet-4-6") -> dict:
 
     client = Anthropic(api_key=api_key)
 
+    # Recon output (especially nikto/gobuster on a noisy host) can be large; cap it so a
+    # single host doesn't blow the prompt budget. This is a blunt truncation — it can cut
+    # a tool's output mid-line — but the system prompt already tells Claude not to invent
+    # findings for incomplete data, so a truncated tail is safe, just less thorough.
     user_content = "RAW RECON OUTPUT:\n\n" + json.dumps(recon_data, indent=2)[:50000]
 
     response = client.messages.create(
         model=model,
-        max_tokens=4000,
+        # Generous budget: the schema includes per-finding attack_vector text plus a
+        # separate remediation_plan section, so a host with many findings produces a lot
+        # of JSON. Too low a limit here risks the response getting cut off mid-JSON,
+        # which would fail to parse and fall through to the error-fallback dict below.
+        max_tokens=8000,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_content}],
     )
 
     text = "".join(block.text for block in response.content if block.type == "text")
+    # Claude is told to return raw JSON, but models sometimes wrap it in a ```json fence
+    # anyway — strip that defensively rather than trusting the instruction held.
     text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
 
     try:

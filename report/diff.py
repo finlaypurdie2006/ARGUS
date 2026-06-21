@@ -36,17 +36,14 @@ def load_findings(run_dir: str):
 
 def compute_diff(previous: dict, current: dict) -> dict:
     """Diff two findings.json structures by finding title (case-insensitive)."""
-    prev_map = {f.get("title", "").strip().lower(): f.get("severity", "Info")
-                for f in previous.get("findings", [])}
-    curr_map = {f.get("title", "").strip().lower(): f.get("severity", "Info")
-                for f in current.get("findings", [])}
-
+    # One lookup per side (title -> finding dict) is enough — severity is read straight
+    # off the stored finding rather than building a second parallel {title: severity} map.
     prev_lookup = {f.get("title", "").strip().lower(): f for f in previous.get("findings", [])}
     curr_lookup = {f.get("title", "").strip().lower(): f for f in current.get("findings", [])}
 
-    new_titles = set(curr_map) - set(prev_map)
-    resolved_titles = set(prev_map) - set(curr_map)
-    common_titles = set(curr_map) & set(prev_map)
+    new_titles = set(curr_lookup) - set(prev_lookup)
+    resolved_titles = set(prev_lookup) - set(curr_lookup)
+    common_titles = set(curr_lookup) & set(prev_lookup)
 
     return {
         "previous_risk_level": previous.get("risk_level", "Unknown"),
@@ -54,7 +51,12 @@ def compute_diff(previous: dict, current: dict) -> dict:
         "new_findings": [curr_lookup[t] for t in new_titles],
         "resolved_findings": [prev_lookup[t] for t in resolved_titles],
         "severity_changes": [
-            {"title": curr_lookup[t].get("title"), "from": prev_map[t], "to": curr_map[t]}
-            for t in common_titles if prev_map[t] != curr_map[t]
+            {
+                "title": curr_lookup[t].get("title"),
+                "from": prev_lookup[t].get("severity", "Info"),
+                "to": curr_lookup[t].get("severity", "Info"),
+            }
+            for t in common_titles
+            if prev_lookup[t].get("severity", "Info") != curr_lookup[t].get("severity", "Info")
         ],
     }
