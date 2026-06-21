@@ -5,6 +5,7 @@ All notable changes to ARGUS are documented in this file.
 ## [0.3.0] - testing branch
 
 ### Added
+- `--no-report` flag + an interactive prompt — choose PDF/HTML reports (default) or terminal-output-only per run, instead of always generating reports
 - `attack_vector` field on findings — Claude names the general exploitation technique/class (not exploit code) for each finding; surfaced as a "Possible Attack Vectors" section in the terminal output (Critical/High only) and in the PDF/HTML detailed findings
 - Parallel scan execution — nmap, web tools, TLS check, and header check all run concurrently via a thread pool (previously sequential)
 - `recon/ssl_headers.py` — pure-Python TLS certificate inspection and HTTP security header checks (no extra binaries needed)
@@ -26,6 +27,7 @@ All notable changes to ARGUS are documented in this file.
 - Green startup banner with tagline, responsible-use disclaimer, and credit line
 
 ### Changed
+- PDF: "Open Ports & Services" now starts on its own page instead of running on directly after Scope & Methodology
 - `report/common.py` added as a shared module for severity colors/ordering and sort helpers — removes ~4 copy-pasted constant blocks and sort-key lambdas that had drifted across `pdf_gen.py`, `html_gen.py`, and `index_gen.py`
 - `recon/network.py` now catches missing-binary/timeout errors the same way `recon/web.py` already did, and always cleans up its temp XML file (previously leaked on any exception)
 - `recon/ssl_headers.py`: shared SSL-context helper instead of duplicating it twice; HTTP connections are now explicitly closed in a `finally` block (previously leaked a socket on a failed request)

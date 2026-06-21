@@ -88,6 +88,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Print the commands that would run, without running them")
     parser.add_argument("--init", action="store_true", help="Interactively create config.yaml and exit")
     parser.add_argument("--history", action="store_true", help="List past runs + risk trend for this target and exit")
+    parser.add_argument("--no-report", action="store_true",
+                         help="Skip the reports-vs-terminal prompt; terminal output only, no PDF/HTML/index")
     args = parser.parse_args()
 
     if args.init:
@@ -144,6 +146,22 @@ def main():
         print()
         return
 
+    # ---------- reports vs terminal-only ----------
+    generate_reports = True
+    if args.no_report:
+        generate_reports = False
+        vprint(args.quiet, "[*] --no-report set: terminal output only, no PDF/HTML/index will be generated\n")
+    else:
+        try:
+            answer = input("Generate PDF/HTML reports, or just show terminal output? [reports/terminal] (default: reports): ").strip().lower()
+        except EOFError:
+            answer = ""
+        if answer in ("terminal", "t", "no", "n"):
+            generate_reports = False
+            print("[*] Terminal output only — skipping PDF/HTML/index generation.\n")
+        else:
+            print("[*] Will generate PDF + HTML reports.\n")
+
     # ---------- preflight: warn about missing binaries before scanning ----------
     binary_tasks = {"nmap"} if args.skip_web else BINARY_BACKED
     binary_tools = {name: tools.get(name, name) for name in binary_tasks}
@@ -172,7 +190,7 @@ def main():
         tasks["ssl_cert"] = lambda: get_ssl_certificate(target, port=ssl_port)
         tasks["security_headers"] = lambda: check_security_headers_auto(target)
 
-    total_steps = len(tasks) + 4  # + analyze + diff + pdf + html
+    total_steps = len(tasks) + 2 + (2 if generate_reports else 0)  # + analyze + diff [+ pdf + html]
     progress = ProgressBar(total_steps)
     started_at = datetime.datetime.now()
 
@@ -246,19 +264,23 @@ def main():
         "tools_run": tools_run,
     }
 
-    progress.update("Building PDF report")
-    pdf_path = os.path.join(run_dir, "recon_report.pdf")
-    build_pdf(findings, target, pdf_path, scan_meta=scan_meta,
-              ssl_info=ssl_result, headers_info=headers_result, diff=diff)
+    pdf_path = html_path = index_path = None
+    if generate_reports:
+        progress.update("Building PDF report")
+        pdf_path = os.path.join(run_dir, "recon_report.pdf")
+        build_pdf(findings, target, pdf_path, scan_meta=scan_meta,
+                  ssl_info=ssl_result, headers_info=headers_result, diff=diff)
 
-    progress.update("Building HTML report")
-    html_path = os.path.join(run_dir, "recon_report.html")
-    build_html(findings, target, html_path, scan_meta=scan_meta,
-               ssl_info=ssl_result, headers_info=headers_result, diff=diff)
+        progress.update("Building HTML report")
+        html_path = os.path.join(run_dir, "recon_report.html")
+        build_html(findings, target, html_path, scan_meta=scan_meta,
+                   ssl_info=ssl_result, headers_info=headers_result, diff=diff)
 
-    index_path = build_index(run_dir, target, timestamp, findings.get("risk_level", "Unknown"))
+        index_path = build_index(run_dir, target, timestamp, findings.get("risk_level", "Unknown"))
 
-    # convenience "latest" symlink (best-effort, skip silently if unsupported)
+    # convenience "latest" symlink (best-effort, skip silently if unsupported) —
+    # points at the run folder regardless of generate_reports, since raw_recon.json
+    # and findings.json are always written there.
     latest_link = os.path.join(output_dir, target_slug, "latest")
     try:
         if os.path.islink(latest_link) or os.path.exists(latest_link):
@@ -269,9 +291,10 @@ def main():
 
     vprint(args.quiet, f"\n[+] Raw data:  {raw_path}")
     vprint(args.quiet, f"[+] Findings:  {findings_path}")
-    vprint(args.quiet, f"[+] PDF:       {pdf_path}")
-    vprint(args.quiet, f"[+] HTML:      {html_path}")
-    vprint(args.quiet, f"[+] Index:     {index_path}")
+    if generate_reports:
+        vprint(args.quiet, f"[+] PDF:       {pdf_path}")
+        vprint(args.quiet, f"[+] HTML:      {html_path}")
+        vprint(args.quiet, f"[+] Index:     {index_path}")
     if diff:
         vprint(args.quiet, f"[+] Diff vs:   {prev_run_dir}")
 
@@ -279,7 +302,10 @@ def main():
     print_attack_vectors(findings)
 
     if args.open:
-        try_open(html_path)
+        if generate_reports:
+            try_open(html_path)
+        else:
+            vprint(args.quiet, "[*] --open ignored: no HTML report was generated this run")
 
 
 if __name__ == "__main__":

@@ -154,6 +154,7 @@ def build_pdf(findings: dict, target: str, output_path: str, scan_meta: dict = N
     # ---------- Open ports table ----------
     ports = findings.get("open_ports", [])
     if ports:
+        story.append(PageBreak())
         story.append(Paragraph("Open Ports &amp; Services", styles["Heading2"]))
         data = [["Port", "Service", "Version", "Note"]]
         for p in ports:

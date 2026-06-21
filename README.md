@@ -41,9 +41,10 @@ python3 main.py --init
 python3 main.py
 ```
 
-Before scanning, you'll be prompted on port range (the startup banner already carries the responsible-use disclaimer):
+Before scanning, you'll be prompted on port range and report format (the startup banner already carries the responsible-use disclaimer):
 ```
 Scan all 65535 ports instead of the configured range (1-1000)? [y/N]:
+Generate PDF/HTML reports, or just show terminal output? [reports/terminal] (default: reports):
 ```
 
 **Flags**
@@ -52,10 +53,11 @@ Scan all 65535 ports instead of the configured range (1-1000)? [y/N]:
 |---|---|
 | `--skip-web` | Network recon only (skip whatweb/nikto/gobuster/subfinder/TLS/headers) |
 | `--all-ports` | Scan all 65535 ports, skipping the port-range prompt |
+| `--no-report` | Skip the reports-vs-terminal prompt; terminal output only, no PDF/HTML/index |
 | `--yes` | Skip the placeholder-target confirmation prompt (for automation/cron) |
 | `--dry-run` | Print the exact commands that would run, without running them |
 | `--quiet` | Suppress per-tool chatter; show only the progress bar + final summary |
-| `--open` | Auto-open the HTML report when the run finishes |
+| `--open` | Auto-open the HTML report when the run finishes (no-op if `--no-report`/terminal-only) |
 | `--init` | Interactive wizard to create `config.yaml` |
 | `--history` | List past runs for this target with risk-level trend, then exit |
 
