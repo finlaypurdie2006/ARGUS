@@ -84,7 +84,9 @@ def main():
                          help="Scan all 65535 ports without prompting (overrides ports in config.yaml)")
     parser.add_argument("--quiet", action="store_true", help="Suppress per-tool chatter; show only the progress bar + final summary")
     parser.add_argument("--open", action="store_true", help="Open the HTML report automatically when done")
-    parser.add_argument("--yes", action="store_true", help="Skip the placeholder-target confirmation prompt (for automation)")
+    parser.add_argument("--yes", action="store_true",
+                         help="Skip interactive target/domain prompts and the placeholder-target "
+                              "confirmation; use config.yaml values as-is (for automation)")
     parser.add_argument("--dry-run", action="store_true", help="Print the commands that would run, without running them")
     parser.add_argument("--init", action="store_true", help="Interactively create config.yaml and exit")
     parser.add_argument("--history", action="store_true", help="List past runs + risk trend for this target and exit")
@@ -98,21 +100,47 @@ def main():
 
     print_banner()
     cfg = load_config(args.config)
-    target = cfg["target"]
-    domain = cfg.get("domain", "")
     tools = cfg.get("tools", {})
     output_dir = cfg.get("output_dir", "output")
     ssl_port = cfg.get("ssl_port", 443)
-    target_slug = slugify(target)
+    config_target = cfg.get("target", "")
+    config_domain = cfg.get("domain", "")
 
     if args.history:
-        runs = list_runs(output_dir, target_slug)
-        print_history(runs, target)
+        runs = list_runs(output_dir, slugify(config_target))
+        print_history(runs, config_target)
         return
+
+    # ---------- ask what to scan instead of requiring a config.yaml edit ----------
+    # config.yaml's target/domain are now just defaults shown in [brackets] — hitting
+    # Enter keeps them, typing something new uses that for this run only (the file
+    # itself is never rewritten here). --yes/--dry-run skip this so automated/cron
+    # runs never block waiting on stdin.
+    if args.yes or args.dry_run:
+        target = config_target
+        domain = config_domain
+    else:
+        try:
+            target_input = input(f"Target IP or hostname to scan [{config_target or 'none set'}]: ").strip()
+        except EOFError:
+            target_input = ""
+        target = target_input or config_target
+        if not target:
+            print("[!] No target provided and none set in config.yaml. Aborting.")
+            return
+
+        try:
+            domain_input = input(f"Domain for subdomain enum, optional [{config_domain or 'N/A'}]: ").strip()
+        except EOFError:
+            domain_input = ""
+        domain = domain_input or config_domain
+        print(f"[*] Domain: {domain or 'N/A'}\n")
+
+    target_slug = slugify(target)
 
     if target == PLACEHOLDER_TARGET:
         print(f"[!] Target is still the default placeholder ({PLACEHOLDER_TARGET}).")
-        print("    Edit config.yaml, or run: python3 main.py --init\n")
+        print("    Enter a real target at the prompt, or edit config.yaml.\n")
         if not args.yes and not args.dry_run:
             try:
                 cont = input("Continue anyway with this target? [y/N]: ").strip().lower()

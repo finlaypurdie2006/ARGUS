@@ -27,7 +27,7 @@ sudo apt install nmap nikto whatweb gobuster subfinder
 (If `subfinder` isn't in your apt repos, grab a prebuilt binary from
 https://github.com/projectdiscovery/subfinder/releases/latest)
 
-Edit `config.yaml`: set `target`, `domain` (optional), `ports`, wordlist path.
+Edit `config.yaml` for tool paths/wordlist/ports if you want different defaults — you no longer need to edit `target`/`domain` here, since `main.py` will ask for them each run (see below).
 
 **Model:** defaults to `claude-sonnet-4-6` for the best analysis quality (catches subtler CVE matches, writes more nuanced remediation guidance). For faster/cheaper iterative runs, set `anthropic_model` to `claude-haiku-4-5-20251001` in `config.yaml`.
 
@@ -41,11 +41,14 @@ python3 main.py --init
 python3 main.py
 ```
 
-Before scanning, you'll be prompted on port range and report format (the startup banner already carries the responsible-use disclaimer):
+Before scanning, you'll be prompted for target, domain, port range, and report format:
 ```
+Target IP or hostname to scan [192.168.1.10]: 10.10.11.52
+Domain for subdomain enum, optional [N/A]: 
 Scan all 65535 ports instead of the configured range (1-1000)? [y/N]:
 Generate PDF/HTML reports, or just show terminal output? [reports/terminal] (default: reports):
 ```
+Hitting Enter on target/domain keeps whatever's in `config.yaml`; typing something new uses it for that run only (the file itself isn't rewritten). Leaving domain blank shows as N/A and skips subfinder.
 
 **Flags**
 
@@ -54,7 +57,7 @@ Generate PDF/HTML reports, or just show terminal output? [reports/terminal] (def
 | `--skip-web` | Network recon only (skip whatweb/nikto/gobuster/subfinder/TLS/headers) |
 | `--all-ports` | Scan all 65535 ports, skipping the port-range prompt |
 | `--no-report` | Skip the reports-vs-terminal prompt; terminal output only, no PDF/HTML/index |
-| `--yes` | Skip the placeholder-target confirmation prompt (for automation/cron) |
+| `--yes` | Skip the target/domain prompts and placeholder-target confirmation; use config.yaml values as-is (for automation/cron) |
 | `--dry-run` | Print the exact commands that would run, without running them |
 | `--quiet` | Suppress per-tool chatter; show only the progress bar + final summary |
 | `--open` | Auto-open the HTML report when the run finishes (no-op if `--no-report`/terminal-only) |
