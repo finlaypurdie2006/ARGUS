@@ -192,6 +192,8 @@ def build_html(findings: dict, target: str, output_path: str, scan_meta: dict = 
 <p>{_e(f.get('description'))}</p>""")
         if f.get("evidence"):
             parts.append(f"<span class='evidence'>{_e(f.get('evidence'))}</span>")
+        if f.get("attack_vector"):
+            parts.append(f"<p><b>Possible attack vector:</b> {_e(f.get('attack_vector'))}</p>")
         if f.get("recommendation"):
             parts.append(f"<p><b>Immediate fix:</b> {_e(f.get('recommendation'))}</p>")
         parts.append("</div>")

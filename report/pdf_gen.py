@@ -249,6 +249,9 @@ def build_pdf(findings: dict, target: str, output_path: str, scan_meta: dict = N
         if f.get("evidence"):
             story.append(Spacer(1, 4))
             story.append(Paragraph(f"<i>Evidence:</i> {f.get('evidence')}", styles["Small"]))
+        if f.get("attack_vector"):
+            story.append(Spacer(1, 4))
+            story.append(Paragraph(f"<b>Possible attack vector:</b> {f.get('attack_vector')}", styles["Normal"]))
         if f.get("recommendation"):
             story.append(Spacer(1, 4))
             story.append(Paragraph(f"<b>Immediate fix:</b> {f.get('recommendation')}", styles["Normal"]))

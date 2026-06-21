@@ -105,6 +105,24 @@ def print_run_summary(findings: dict):
     print("=" * 50 + "\n")
 
 
+def print_attack_vectors(findings: dict):
+    """Print likely exploitation paths for Critical/High findings — general technique only,
+    no ready-to-run exploit commands. Intended for authorized practice (e.g. HTB/CTF boxes)."""
+    vectors = [
+        f for f in findings.get("findings", [])
+        if f.get("attack_vector") and f.get("severity") in ("Critical", "High")
+    ]
+    if not vectors:
+        return
+    print("Possible Attack Vectors:")
+    for f in vectors:
+        sev = f.get("severity", "")
+        cve = f" ({f.get('cve')})" if f.get("cve") else ""
+        print(f"  {colorize('[' + sev + ']', sev)} {f.get('title', '')}{cve}")
+        print(f"      -> {f.get('attack_vector')}")
+    print()
+
+
 def print_history(runs: list, target: str):
     """Print a target's scan history with risk-level trend, oldest first."""
     print(f"\nScan history for {target}:\n")

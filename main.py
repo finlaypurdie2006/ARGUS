@@ -24,7 +24,7 @@ from report.history import list_runs
 from report.index_gen import build_index
 from preflight import check_tools
 from setup_wizard import run_init_wizard
-from ui import print_banner, ProgressBar, print_run_summary, print_history, try_open
+from ui import print_banner, ProgressBar, print_run_summary, print_attack_vectors, print_history, try_open
 
 LABELS = {
     "nmap": "nmap: service/version scan",
@@ -275,6 +275,7 @@ def main():
         vprint(args.quiet, f"[+] Diff vs:   {prev_run_dir}")
 
     print_run_summary(findings)
+    print_attack_vectors(findings)
 
     if args.open:
         try_open(html_path)

@@ -71,7 +71,7 @@ Each run gets its own timestamped folder: `output/<target>/<YYYYMMDD_HHMMSS>/`
 - `findings.json` — Claude's structured analysis
 - `recon_report.pdf` / `recon_report.html` — full reports
 - `index.html` — quick links to everything above
-- A colored risk/severity summary also prints to the terminal at the end of each run.
+- A colored risk/severity summary also prints to the terminal at the end of each run, along with a **Possible Attack Vectors** section for Critical/High findings — names the general exploitation technique (e.g. "unauthenticated RCE via crafted FTP username"), not ready-to-run exploit commands.
 
 If a previous run exists for the same target, the new report includes a **Changes Since Last Scan** section (new findings, resolved findings, severity changes). Use `--history` to see the risk trend across all runs for a target.
 
