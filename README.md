@@ -43,12 +43,12 @@ python3 main.py
 
 Before scanning, you'll be prompted for target, domain, port range, and report format:
 ```
-Target IP or hostname to scan [192.168.1.10]: 10.10.11.52
+Target IP or hostname to scan: 10.10.11.52
 Domain for subdomain enum, optional [N/A]: 
 Scan all 65535 ports instead of the configured range (1-1000)? [y/N]:
 Generate PDF/HTML reports as well as terminal output? [y/N] (default: terminal only):
 ```
-Hitting Enter on target/domain keeps whatever's in `config.yaml`; typing something new uses it for that run only (the file itself isn't rewritten). Leaving domain blank shows as N/A and skips subfinder.
+`config.yaml` ships with no target set, so you'll be asked every run. If you set one in `config.yaml`, it shows as a default in `[brackets]` — Enter keeps it, typing something new uses it for that run only (the file itself isn't rewritten). Leaving domain blank shows as N/A and skips subfinder.
 
 **Flags**
 

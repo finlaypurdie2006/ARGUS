@@ -36,7 +36,6 @@ LABELS = {
     "security_headers": "HTTP: security header check",
 }
 BINARY_BACKED = {"nmap", "subfinder", "whatweb", "nikto", "gobuster"}
-PLACEHOLDER_TARGET = "192.168.1.10"
 
 
 def load_config(path: str) -> dict:
@@ -85,8 +84,8 @@ def main():
     parser.add_argument("--quiet", action="store_true", help="Suppress per-tool chatter; show only the progress bar + final summary")
     parser.add_argument("--open", action="store_true", help="Open the HTML report automatically when done")
     parser.add_argument("--yes", action="store_true",
-                         help="Skip interactive target/domain prompts and the placeholder-target "
-                              "confirmation; use config.yaml values as-is (for automation)")
+                         help="Skip interactive target/domain prompts; use config.yaml values "
+                              "as-is (for automation; requires target to be set in config.yaml)")
     parser.add_argument("--dry-run", action="store_true", help="Print the commands that would run, without running them")
     parser.add_argument("--init", action="store_true", help="Interactively create config.yaml and exit")
     parser.add_argument("--history", action="store_true", help="List past runs + risk trend for this target and exit")
@@ -112,21 +111,25 @@ def main():
         return
 
     # ---------- ask what to scan instead of requiring a config.yaml edit ----------
-    # config.yaml's target/domain are now just defaults shown in [brackets] — hitting
-    # Enter keeps them, typing something new uses that for this run only (the file
-    # itself is never rewritten here). --yes/--dry-run skip this so automated/cron
+    # config.yaml's target/domain are optional defaults shown in [brackets] when set —
+    # hitting Enter keeps them, typing something new uses that for this run only (the
+    # file itself is never rewritten here). --yes/--dry-run skip this so automated/cron
     # runs never block waiting on stdin.
     if args.yes or args.dry_run:
         target = config_target
         domain = config_domain
+        if not target:
+            print("[!] No target set in config.yaml and --yes/--dry-run skips the prompt. Aborting.")
+            return
     else:
+        target_label = f"Target IP or hostname to scan [{config_target}]: " if config_target else "Target IP or hostname to scan: "
         try:
-            target_input = input(f"Target IP or hostname to scan [{config_target or 'none set'}]: ").strip()
+            target_input = input(target_label).strip()
         except EOFError:
             target_input = ""
         target = target_input or config_target
         if not target:
-            print("[!] No target provided and none set in config.yaml. Aborting.")
+            print("[!] No target provided. Aborting.")
             return
 
         try:
@@ -137,18 +140,6 @@ def main():
         print(f"[*] Domain: {domain or 'N/A'}\n")
 
     target_slug = slugify(target)
-
-    if target == PLACEHOLDER_TARGET:
-        print(f"[!] Target is still the default placeholder ({PLACEHOLDER_TARGET}).")
-        print("    Enter a real target at the prompt, or edit config.yaml.\n")
-        if not args.yes and not args.dry_run:
-            try:
-                cont = input("Continue anyway with this target? [y/N]: ").strip().lower()
-            except EOFError:
-                cont = "n"
-            if cont not in ("y", "yes"):
-                print("Aborted.")
-                return
 
     ports = cfg.get("ports", "1-1000")
     if args.all_ports:

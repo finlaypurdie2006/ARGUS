@@ -1,4 +1,4 @@
-target: "192.168.1.10"          # IP or hostname — must be a system you own/control
+target: ""                      # IP or hostname — leave blank, main.py will prompt for it each run
 domain: ""                      # optional, for subfinder/web recon (leave blank if N/A)
 ports: "1-1000"                 # default nmap port range — overridden if you say yes to the all-ports prompt at runtime
 output_dir: "output"
