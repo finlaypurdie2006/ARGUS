@@ -4,6 +4,9 @@ All notable changes to ARGUS are documented in this file.
 
 ## [0.3.0] - testing branch
 
+### Removed
+- "Changes Since Last Scan" diff feature entirely (`report/diff.py` deleted, removed from PDF/HTML/terminal output). Reused HTB-style IPs get reassigned to completely unrelated boxes between sessions, so comparing against "the last scan of this IP" was comparing against an unrelated target — actively misleading rather than useful. `--history` (risk trend per target, no comparison logic) is unaffected.
+
 ### Added
 - AI on/off prompt — now the very first question asked, before target/domain, default **no**. Declining means no Claude call is made at all (no `ANTHROPIC_API_KEY` needed), and the raw scan results print straight to the terminal via `ui.print_raw_results()` instead of going through analysis/reports. Saying yes behaves as before: structured findings, CVEs, attack vectors, and PDF+HTML reports. `--no-ai` / `--ai` flags skip the prompt for automation. This replaces the old separate "generate reports or terminal-only" prompt — that choice is now just a consequence of the AI choice.
 - Interactive target/domain prompts — no longer need to hand-edit `config.yaml` for the IP/domain to scan; the values there now act as defaults shown in `[brackets]` (or no bracket at all if unset), overridable per run. `config.yaml` ships with `target: ""` — no placeholder IP shipped anymore, so blank input with no config default just aborts with a clear message instead of silently scanning a meaningless example IP. Blank domain displays as N/A and skips subfinder, same as before.

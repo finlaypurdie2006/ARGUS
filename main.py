@@ -19,7 +19,6 @@ from recon.ssl_headers import get_ssl_certificate, check_security_headers_auto
 from report.analyze import analyze
 from report.pdf_gen import build_pdf
 from report.html_gen import build_html
-from report.diff import find_previous_run, load_findings, compute_diff
 from report.history import list_runs
 from report.index_gen import build_index
 from preflight import check_tools
@@ -222,7 +221,7 @@ def main():
         tasks["ssl_cert"] = lambda: get_ssl_certificate(target, port=ssl_port)
         tasks["security_headers"] = lambda: check_security_headers_auto(target)
 
-    total_steps = len(tasks) + (4 if use_ai else 0)  # + analyze + diff + pdf + html, only with AI
+    total_steps = len(tasks) + (3 if use_ai else 0)  # + analyze + pdf + html, only with AI
     progress = ProgressBar(total_steps)
     started_at = datetime.datetime.now()
 
@@ -261,8 +260,6 @@ def main():
 
     findings = None
     findings_path = None
-    diff = None
-    prev_run_dir = None
 
     if use_ai:
         progress.update("Claude: analyzing results")
@@ -275,13 +272,6 @@ def main():
         findings_path = os.path.join(run_dir, "findings.json")
         with open(findings_path, "w") as f:
             json.dump(findings, f, indent=2)
-
-        progress.update("Comparing to previous run")
-        prev_run_dir = find_previous_run(output_dir, target_slug, run_dir)
-        if prev_run_dir:
-            prev_findings = load_findings(prev_run_dir)
-            if prev_findings:
-                diff = compute_diff(prev_findings, findings)
 
     finished_at = datetime.datetime.now()
     tools_run = [{"name": "nmap", "command": network_result.get("command", "")}]
@@ -306,12 +296,12 @@ def main():
         progress.update("Building PDF report")
         pdf_path = os.path.join(run_dir, "recon_report.pdf")
         build_pdf(findings, target, pdf_path, scan_meta=scan_meta,
-                  ssl_info=ssl_result, headers_info=headers_result, diff=diff)
+                  ssl_info=ssl_result, headers_info=headers_result)
 
         progress.update("Building HTML report")
         html_path = os.path.join(run_dir, "recon_report.html")
         build_html(findings, target, html_path, scan_meta=scan_meta,
-                   ssl_info=ssl_result, headers_info=headers_result, diff=diff)
+                   ssl_info=ssl_result, headers_info=headers_result)
 
         index_path = build_index(run_dir, target, timestamp, findings.get("risk_level", "Unknown"))
 
@@ -333,8 +323,6 @@ def main():
             vprint(args.quiet, f"[+] PDF:       {pdf_path}")
             vprint(args.quiet, f"[+] HTML:      {html_path}")
             vprint(args.quiet, f"[+] Index:     {index_path}")
-        if diff:
-            vprint(args.quiet, f"[+] Diff vs:   {prev_run_dir}")
 
         print_run_summary(findings)
         print_attack_vectors(findings)

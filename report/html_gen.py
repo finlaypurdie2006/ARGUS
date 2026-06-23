@@ -31,8 +31,7 @@ tr:nth-child(even) td { background: #f9fafb; }
             display: block; margin-top: 6px; white-space: pre-wrap; word-break: break-word; }
 .card { background: white; border-radius: 6px; padding: 14px 18px; margin: 10px 0;
         box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
-.diff-new { color: #b91c1c; font-weight: 600; }
-.diff-resolved { color: #15803d; font-weight: 600; }
+.text-warn { color: #b91c1c; font-weight: 600; }
 .priority-block { margin-bottom: 18px; }
 .small { font-size: 12.5px; color: #6b7280; }
 ul.plain { padding-left: 20px; margin: 6px 0; }
@@ -52,7 +51,7 @@ def _table(headers, rows) -> str:
 
 
 def build_html(findings: dict, target: str, output_path: str, scan_meta: dict = None,
-                ssl_info: dict = None, headers_info: dict = None, diff: dict = None) -> str:
+                ssl_info: dict = None, headers_info: dict = None) -> str:
     scan_meta = scan_meta or {}
     risk = findings.get("risk_level", "Unknown")
     risk_color = SEVERITY_COLORS.get(risk, "#000")
@@ -70,30 +69,6 @@ def build_html(findings: dict, target: str, output_path: str, scan_meta: dict = 
 
     parts.append("<h2>Executive Summary</h2>")
     parts.append(f"<p>{_e(findings.get('summary', 'N/A'))}</p>")
-
-    if diff:
-        parts.append("<h2>Changes Since Last Scan</h2>")
-        parts.append(f"<div class='card'><p class='small'>Previous risk: "
-                      f"<b>{_e(diff.get('previous_risk_level'))}</b> &rarr; Current risk: "
-                      f"<b>{_e(diff.get('current_risk_level'))}</b></p>")
-        new_f = diff.get("new_findings", [])
-        resolved_f = diff.get("resolved_findings", [])
-        changed = diff.get("severity_changes", [])
-        if new_f:
-            parts.append("<p class='diff-new'>New findings:</p><ul class='plain'>")
-            parts += [f"<li>[{_e(f.get('severity'))}] {_e(f.get('title'))}</li>" for f in new_f]
-            parts.append("</ul>")
-        if resolved_f:
-            parts.append("<p class='diff-resolved'>Resolved since last scan:</p><ul class='plain'>")
-            parts += [f"<li>{_e(f.get('title'))}</li>" for f in resolved_f]
-            parts.append("</ul>")
-        if changed:
-            parts.append("<p>Severity changes:</p><ul class='plain'>")
-            parts += [f"<li>{_e(c.get('title'))}: {_e(c.get('from'))} &rarr; {_e(c.get('to'))}</li>" for c in changed]
-            parts.append("</ul>")
-        if not (new_f or resolved_f or changed):
-            parts.append("<p class='small'>No changes from the previous scan.</p>")
-        parts.append("</div>")
 
     if all_findings:
         parts.append("<h2>Findings at a Glance</h2>")
@@ -152,7 +127,7 @@ def build_html(findings: dict, target: str, output_path: str, scan_meta: dict = 
             if present:
                 parts.append(_table(["Present Header", "Value"], list(present.items())))
             if missing:
-                parts.append("<p class='diff-new'>Missing recommended headers:</p><ul class='plain'>")
+                parts.append("<p class='text-warn'>Missing recommended headers:</p><ul class='plain'>")
                 parts += [f"<li>{_e(h)}</li>" for h in missing]
                 parts.append("</ul>")
 

@@ -80,7 +80,7 @@ Each run gets its own timestamped folder: `output/<target>/<YYYYMMDD_HHMMSS>/`
   - `recon_report.pdf` / `recon_report.html` — full reports
   - `index.html` — quick links to everything above
   - A colored risk/severity summary prints to the terminal, plus a **Possible Attack Vectors** section for Critical/High findings — names the general exploitation technique (e.g. "unauthenticated RCE via crafted FTP username"), not ready-to-run exploit commands
-  - If a previous AI run exists for the same target, the report includes a **Changes Since Last Scan** section. Use `--history` to see the risk trend across runs.
+  - Use `--history` to see the risk trend across runs for a target.
 - Without AI (default, or `--no-ai`): the raw scan results print straight to the terminal — open ports/services, each tool's raw output, TLS cert details, missing security headers. No findings.json, no reports, no severity/CVEs (there's no AI to assign them).
 
 ## Pipeline
@@ -89,7 +89,7 @@ Each run gets its own timestamped folder: `output/<target>/<YYYYMMDD_HHMMSS>/`
 2. `recon/web.py` runs subfinder, whatweb, nikto, gobuster.
 3. `recon/ssl_headers.py` inspects the TLS certificate and checks HTTP security headers (pure Python, no extra binaries).
 4. All of the above run in parallel via a thread pool.
-5. **If AI was selected:** `report/analyze.py` sends raw output to Claude, gets back structured JSON findings + a prioritized remediation plan; `report/diff.py` compares against the most recent previous run; `report/pdf_gen.py` / `report/html_gen.py` render the final reports.
+5. **If AI was selected:** `report/analyze.py` sends raw output to Claude, gets back structured JSON findings + a prioritized remediation plan; `report/pdf_gen.py` / `report/html_gen.py` render the final reports.
 6. **If not:** `ui.print_raw_results()` prints the raw recon data directly — no Claude call is ever made.
 
 ## Notes

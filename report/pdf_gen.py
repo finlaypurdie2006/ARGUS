@@ -58,7 +58,7 @@ def _wrapped_table(data, col_widths, styles, header=True):
 
 
 def build_pdf(findings: dict, target: str, output_path: str, scan_meta: dict = None,
-               ssl_info: dict = None, headers_info: dict = None, diff: dict = None) -> str:
+               ssl_info: dict = None, headers_info: dict = None) -> str:
     scan_meta = scan_meta or {}
     styles = _styles()
     doc = SimpleDocTemplate(
@@ -86,34 +86,6 @@ def build_pdf(findings: dict, target: str, output_path: str, scan_meta: dict = N
     story.append(Paragraph("Executive Summary", styles["Heading2"]))
     story.append(Paragraph(findings.get("summary", "N/A"), styles["Normal"]))
     story.append(Spacer(1, 14))
-
-    # ---------- Changes since last scan ----------
-    if diff:
-        story.append(Paragraph("Changes Since Last Scan", styles["Heading2"]))
-        story.append(Paragraph(
-            f"Previous risk: <b>{diff.get('previous_risk_level')}</b> &rarr; "
-            f"Current risk: <b>{diff.get('current_risk_level')}</b>", styles["Normal"]))
-        new_f = diff.get("new_findings", [])
-        resolved_f = diff.get("resolved_findings", [])
-        changed = diff.get("severity_changes", [])
-        if new_f:
-            story.append(Spacer(1, 4))
-            story.append(Paragraph("<font color='#b91c1c'><b>New findings:</b></font>", styles["Normal"]))
-            for nf in new_f:
-                story.append(Paragraph(f"• [{nf.get('severity')}] {nf.get('title')}", styles["Normal"]))
-        if resolved_f:
-            story.append(Spacer(1, 4))
-            story.append(Paragraph("<font color='#15803d'><b>Resolved since last scan:</b></font>", styles["Normal"]))
-            for rf in resolved_f:
-                story.append(Paragraph(f"• {rf.get('title')}", styles["Normal"]))
-        if changed:
-            story.append(Spacer(1, 4))
-            story.append(Paragraph("<b>Severity changes:</b>", styles["Normal"]))
-            for c in changed:
-                story.append(Paragraph(f"• {c.get('title')}: {c.get('from')} → {c.get('to')}", styles["Normal"]))
-        if not (new_f or resolved_f or changed):
-            story.append(Paragraph("No changes from the previous scan.", styles["Small"]))
-        story.append(Spacer(1, 14))
 
     # ---------- Findings-at-a-glance ----------
     all_findings = findings.get("findings", [])
