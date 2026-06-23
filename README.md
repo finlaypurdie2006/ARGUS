@@ -13,7 +13,7 @@ cd argus
 python3 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY="your-key-here"
+export ANTHROPIC_API_KEY="your-key-here"   # only needed if you say yes to AI analysis at runtime — see Run, below
 ```
 
 Next time you come back, just `source venv/bin/activate` again before running `main.py` — no need to reinstall. To leave the environment: `deactivate`.
@@ -41,13 +41,16 @@ python3 main.py --init
 python3 main.py
 ```
 
-Before scanning, you'll be prompted for target, domain, port range, and report format:
+Before scanning, you'll be prompted for AI analysis (first question, before anything else), target, domain, and port range:
 ```
+Use AI analysis (Claude) to generate findings + reports? [y/N] (default: no): 
 Target IP or hostname to scan: 10.10.11.52
 Domain for subdomain enum, optional [N/A]: 
 Scan all 65535 ports instead of the configured range (1-1000)? [y/N]:
-Generate PDF/HTML reports as well as terminal output? [y/N] (default: terminal only):
 ```
+
+**The AI question comes first and defaults to no.** Decline it (or just hit Enter) and ARGUS runs with **no `ANTHROPIC_API_KEY` needed at all** — raw nmap/whatweb/nikto/gobuster/TLS/header output prints straight to the terminal: no PDF/HTML, no findings.json, no CVEs/remediation. Say `y` and it analyzes with Claude as before: structured findings, CVEs, attack vectors, and PDF+HTML reports.
+
 `config.yaml` ships with no target set, so you'll be asked every run. If you set one in `config.yaml`, it shows as a default in `[brackets]` — Enter keeps it, typing something new uses it for that run only (the file itself isn't rewritten). Leaving domain blank shows as N/A and skips subfinder.
 
 **Flags**
@@ -56,11 +59,12 @@ Generate PDF/HTML reports as well as terminal output? [y/N] (default: terminal o
 |---|---|
 | `--skip-web` | Network recon only (skip whatweb/nikto/gobuster/subfinder/TLS/headers) |
 | `--all-ports` | Scan all 65535 ports, skipping the port-range prompt |
-| `--no-report` | Skip the reports prompt entirely; terminal output only (same as the default if you just hit Enter) |
-| `--yes` | Skip the target/domain prompts and placeholder-target confirmation; use config.yaml values as-is (for automation/cron) |
+| `--no-ai` | Skip the AI prompt; raw output only, no Claude call, no `ANTHROPIC_API_KEY` needed |
+| `--ai` | Skip the AI prompt; always analyze with Claude and generate reports |
+| `--yes` | Skip target/domain prompts; use config.yaml values as-is (for automation/cron — defaults to no AI unless `--ai` is also passed) |
 | `--dry-run` | Print the exact commands that would run, without running them |
 | `--quiet` | Suppress per-tool chatter; show only the progress bar + final summary |
-| `--open` | Auto-open the HTML report when the run finishes (no-op if `--no-report`/terminal-only) |
+| `--open` | Auto-open the HTML report when the run finishes (no-op in raw/no-AI mode) |
 | `--init` | Interactive wizard to create `config.yaml` |
 | `--history` | List past runs for this target with risk-level trend, then exit |
 
@@ -70,13 +74,14 @@ nmap runs with `-T4` (aggressive timing) by default.
 
 Each run gets its own timestamped folder: `output/<target>/<YYYYMMDD_HHMMSS>/`
 
-- `raw_recon.json` — raw tool output
-- `findings.json` — Claude's structured analysis
-- `recon_report.pdf` / `recon_report.html` — full reports
-- `index.html` — quick links to everything above
-- A colored risk/severity summary also prints to the terminal at the end of each run, along with a **Possible Attack Vectors** section for Critical/High findings — names the general exploitation technique (e.g. "unauthenticated RCE via crafted FTP username"), not ready-to-run exploit commands.
-
-If a previous run exists for the same target, the new report includes a **Changes Since Last Scan** section (new findings, resolved findings, severity changes). Use `--history` to see the risk trend across all runs for a target.
+- `raw_recon.json` — raw tool output (always written)
+- With AI (`y` at the prompt or `--ai`):
+  - `findings.json` — Claude's structured analysis
+  - `recon_report.pdf` / `recon_report.html` — full reports
+  - `index.html` — quick links to everything above
+  - A colored risk/severity summary prints to the terminal, plus a **Possible Attack Vectors** section for Critical/High findings — names the general exploitation technique (e.g. "unauthenticated RCE via crafted FTP username"), not ready-to-run exploit commands
+  - If a previous AI run exists for the same target, the report includes a **Changes Since Last Scan** section. Use `--history` to see the risk trend across runs.
+- Without AI (default, or `--no-ai`): the raw scan results print straight to the terminal — open ports/services, each tool's raw output, TLS cert details, missing security headers. No findings.json, no reports, no severity/CVEs (there's no AI to assign them).
 
 ## Pipeline
 
@@ -84,9 +89,8 @@ If a previous run exists for the same target, the new report includes a **Change
 2. `recon/web.py` runs subfinder, whatweb, nikto, gobuster.
 3. `recon/ssl_headers.py` inspects the TLS certificate and checks HTTP security headers (pure Python, no extra binaries).
 4. All of the above run in parallel via a thread pool.
-5. `report/analyze.py` sends raw output to Claude, gets back structured JSON findings + a prioritized remediation plan.
-6. `report/diff.py` compares against the most recent previous run for the target.
-7. `report/pdf_gen.py` / `report/html_gen.py` render the final reports.
+5. **If AI was selected:** `report/analyze.py` sends raw output to Claude, gets back structured JSON findings + a prioritized remediation plan; `report/diff.py` compares against the most recent previous run; `report/pdf_gen.py` / `report/html_gen.py` render the final reports.
+6. **If not:** `ui.print_raw_results()` prints the raw recon data directly — no Claude call is ever made.
 
 ## Notes
 

@@ -24,7 +24,7 @@ from report.history import list_runs
 from report.index_gen import build_index
 from preflight import check_tools
 from setup_wizard import run_init_wizard
-from ui import print_banner, ProgressBar, print_run_summary, print_attack_vectors, print_history, try_open
+from ui import print_banner, ProgressBar, print_run_summary, print_attack_vectors, print_raw_results, print_history, try_open
 
 LABELS = {
     "nmap": "nmap: service/version scan",
@@ -89,8 +89,11 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Print the commands that would run, without running them")
     parser.add_argument("--init", action="store_true", help="Interactively create config.yaml and exit")
     parser.add_argument("--history", action="store_true", help="List past runs + risk trend for this target and exit")
-    parser.add_argument("--no-report", action="store_true",
-                         help="Skip the reports-vs-terminal prompt; terminal output only, no PDF/HTML/index")
+    parser.add_argument("--no-ai", action="store_true",
+                         help="Skip the AI prompt; raw scan output only, no Claude analysis, "
+                              "no PDF/HTML/index, and no ANTHROPIC_API_KEY needed")
+    parser.add_argument("--ai", action="store_true",
+                         help="Skip the AI prompt; always analyze with Claude and generate reports")
     args = parser.parse_args()
 
     if args.init:
@@ -109,6 +112,32 @@ def main():
         runs = list_runs(output_dir, slugify(config_target))
         print_history(runs, config_target)
         return
+
+    # ---------- use AI or not — first prompt, before anything else ----------
+    # No AI means: no Claude call (no ANTHROPIC_API_KEY needed at all), no PDF/HTML/
+    # index, no diff against past runs — just the raw tool output printed to terminal.
+    if args.no_ai:
+        use_ai = False
+        vprint(args.quiet, "[*] --no-ai set: raw scan output only, no Claude analysis or reports\n")
+    elif args.ai:
+        use_ai = True
+        vprint(args.quiet, "[*] --ai set: will analyze with Claude and generate reports\n")
+    elif args.dry_run:
+        use_ai = False  # irrelevant — dry-run never executes anything either way
+    elif args.yes:
+        use_ai = False  # automation default: no API key required unless --ai is also passed
+    else:
+        try:
+            answer = input("Use AI analysis (Claude) to generate findings + reports? [y/N] (default: no): ").strip().lower()
+        except EOFError:
+            answer = ""
+        use_ai = answer in ("y", "yes")
+        if use_ai:
+            print("[*] Will analyze with Claude and generate PDF/HTML reports.\n")
+        else:
+            print("[*] No AI — raw scan output will be printed to the terminal only.\n")
+
+    generate_reports = use_ai
 
     # ---------- ask what to scan instead of requiring a config.yaml edit ----------
     # config.yaml's target/domain are optional defaults shown in [brackets] when set —
@@ -165,21 +194,6 @@ def main():
         print()
         return
 
-    # ---------- reports vs terminal-only ----------
-    generate_reports = False
-    if args.no_report:
-        vprint(args.quiet, "[*] --no-report set: terminal output only, no PDF/HTML/index will be generated\n")
-    else:
-        try:
-            answer = input("Generate PDF/HTML reports as well as terminal output? [y/N] (default: terminal only): ").strip().lower()
-        except EOFError:
-            answer = ""
-        if answer in ("y", "yes"):
-            generate_reports = True
-            print("[*] Will generate PDF + HTML reports.\n")
-        else:
-            print("[*] Terminal output only — skipping PDF/HTML/index generation.\n")
-
     # ---------- preflight: warn about missing binaries before scanning ----------
     binary_tasks = {"nmap"} if args.skip_web else BINARY_BACKED
     binary_tools = {name: tools.get(name, name) for name in binary_tasks}
@@ -208,7 +222,7 @@ def main():
         tasks["ssl_cert"] = lambda: get_ssl_certificate(target, port=ssl_port)
         tasks["security_headers"] = lambda: check_security_headers_auto(target)
 
-    total_steps = len(tasks) + 2 + (2 if generate_reports else 0)  # + analyze + diff [+ pdf + html]
+    total_steps = len(tasks) + (4 if use_ai else 0)  # + analyze + diff + pdf + html, only with AI
     progress = ProgressBar(total_steps)
     started_at = datetime.datetime.now()
 
@@ -245,24 +259,29 @@ def main():
     with open(raw_path, "w") as f:
         json.dump(recon_data, f, indent=2)
 
-    progress.update("Claude: analyzing results")
-    try:
-        findings = analyze(recon_data, model=cfg.get("anthropic_model", "claude-sonnet-4-6"))
-    except RuntimeError as e:
-        print(f"\n[!] {e}")
-        sys.exit(1)
-
-    findings_path = os.path.join(run_dir, "findings.json")
-    with open(findings_path, "w") as f:
-        json.dump(findings, f, indent=2)
-
-    progress.update("Comparing to previous run")
+    findings = None
+    findings_path = None
     diff = None
-    prev_run_dir = find_previous_run(output_dir, target_slug, run_dir)
-    if prev_run_dir:
-        prev_findings = load_findings(prev_run_dir)
-        if prev_findings:
-            diff = compute_diff(prev_findings, findings)
+    prev_run_dir = None
+
+    if use_ai:
+        progress.update("Claude: analyzing results")
+        try:
+            findings = analyze(recon_data, model=cfg.get("anthropic_model", "claude-sonnet-4-6"))
+        except RuntimeError as e:
+            print(f"\n[!] {e}")
+            sys.exit(1)
+
+        findings_path = os.path.join(run_dir, "findings.json")
+        with open(findings_path, "w") as f:
+            json.dump(findings, f, indent=2)
+
+        progress.update("Comparing to previous run")
+        prev_run_dir = find_previous_run(output_dir, target_slug, run_dir)
+        if prev_run_dir:
+            prev_findings = load_findings(prev_run_dir)
+            if prev_findings:
+                diff = compute_diff(prev_findings, findings)
 
     finished_at = datetime.datetime.now()
     tools_run = [{"name": "nmap", "command": network_result.get("command", "")}]
@@ -297,8 +316,8 @@ def main():
         index_path = build_index(run_dir, target, timestamp, findings.get("risk_level", "Unknown"))
 
     # convenience "latest" symlink (best-effort, skip silently if unsupported) —
-    # points at the run folder regardless of generate_reports, since raw_recon.json
-    # and findings.json are always written there.
+    # points at the run folder regardless of use_ai, since raw_recon.json is always
+    # written there (findings.json only exists if use_ai was True).
     latest_link = os.path.join(output_dir, target_slug, "latest")
     try:
         if os.path.islink(latest_link) or os.path.exists(latest_link):
@@ -308,22 +327,25 @@ def main():
         pass
 
     vprint(args.quiet, f"\n[+] Raw data:  {raw_path}")
-    vprint(args.quiet, f"[+] Findings:  {findings_path}")
-    if generate_reports:
-        vprint(args.quiet, f"[+] PDF:       {pdf_path}")
-        vprint(args.quiet, f"[+] HTML:      {html_path}")
-        vprint(args.quiet, f"[+] Index:     {index_path}")
-    if diff:
-        vprint(args.quiet, f"[+] Diff vs:   {prev_run_dir}")
+    if use_ai:
+        vprint(args.quiet, f"[+] Findings:  {findings_path}")
+        if generate_reports:
+            vprint(args.quiet, f"[+] PDF:       {pdf_path}")
+            vprint(args.quiet, f"[+] HTML:      {html_path}")
+            vprint(args.quiet, f"[+] Index:     {index_path}")
+        if diff:
+            vprint(args.quiet, f"[+] Diff vs:   {prev_run_dir}")
 
-    print_run_summary(findings)
-    print_attack_vectors(findings)
+        print_run_summary(findings)
+        print_attack_vectors(findings)
+    else:
+        print_raw_results(recon_data)
 
     if args.open:
         if generate_reports:
             try_open(html_path)
         else:
-            vprint(args.quiet, "[*] --open ignored: no HTML report was generated this run")
+            vprint(args.quiet, "[*] --open ignored: no HTML report was generated this run (no AI / raw mode)")
 
 
 if __name__ == "__main__":

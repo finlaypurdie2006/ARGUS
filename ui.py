@@ -136,6 +136,69 @@ def print_history(runs: list, target: str):
     print()
 
 
+def print_raw_results(recon_data: dict):
+    """Print unprocessed scan output directly — used when running without AI analysis
+    (--no-ai / declined the AI prompt). No severity, no CVEs, no remediation — just
+    what each tool actually returned, since there's no Claude call to interpret it."""
+    print("\n" + "=" * 50)
+    print("Raw Scan Results (no AI analysis)")
+    print("=" * 50)
+
+    network = recon_data.get("network", {})
+    hosts = network.get("hosts", [])
+    if hosts:
+        for host in hosts:
+            print(f"\nHost: {host.get('ip', '?')}")
+            for p in host.get("ports", []):
+                version = f"{p.get('product', '')} {p.get('version', '')}".strip()
+                line = f"  {p.get('port')}/{p.get('protocol')} {p.get('state')} {p.get('service')}"
+                if version:
+                    line += f" — {version}"
+                print(line)
+    if network.get("raw_stderr"):
+        print(f"\n  nmap stderr: {network['raw_stderr'].strip()}")
+
+    web = recon_data.get("web", {})
+    for name, result in web.items():
+        print(f"\n[{name}]")
+        out = (result.get("stdout") or "").strip()
+        err = (result.get("stderr") or "").strip()
+        if out:
+            print(out)
+        elif err:
+            print(f"  {err}")
+        else:
+            print("  (no output)")
+
+    ssl_info = recon_data.get("ssl")
+    if ssl_info:
+        print("\n[TLS / Certificate]")
+        if ssl_info.get("error"):
+            print(f"  {ssl_info['error']}")
+        else:
+            print(f"  Protocol: {ssl_info.get('protocol')}  Cipher: {ssl_info.get('cipher')}")
+            subject = ssl_info.get("subject") or {}
+            print(f"  Subject CN: {subject.get('commonName', '?')}")
+            print(f"  Valid until: {ssl_info.get('not_after')}  "
+                  f"(days left: {ssl_info.get('days_until_expiry', '?')})")
+
+    headers_info = recon_data.get("security_headers")
+    if headers_info:
+        print("\n[HTTP Security Headers]")
+        if headers_info.get("error"):
+            print(f"  {headers_info['error']}")
+        else:
+            present = headers_info.get("present_headers", {})
+            missing = headers_info.get("missing_headers", [])
+            print(f"  Status: {headers_info.get('status_code')}")
+            if present:
+                print(f"  Present: {', '.join(present)}")
+            if missing:
+                print(f"  Missing: {', '.join(missing)}")
+
+    print("\n" + "=" * 50 + "\n")
+
+
 def try_open(path: str) -> bool:
     """Best-effort open a file in the default browser/app. Never raises."""
     try:

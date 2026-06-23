@@ -5,8 +5,8 @@ All notable changes to ARGUS are documented in this file.
 ## [0.3.0] - testing branch
 
 ### Added
+- AI on/off prompt — now the very first question asked, before target/domain, default **no**. Declining means no Claude call is made at all (no `ANTHROPIC_API_KEY` needed), and the raw scan results print straight to the terminal via `ui.print_raw_results()` instead of going through analysis/reports. Saying yes behaves as before: structured findings, CVEs, attack vectors, and PDF+HTML reports. `--no-ai` / `--ai` flags skip the prompt for automation. This replaces the old separate "generate reports or terminal-only" prompt — that choice is now just a consequence of the AI choice.
 - Interactive target/domain prompts — no longer need to hand-edit `config.yaml` for the IP/domain to scan; the values there now act as defaults shown in `[brackets]` (or no bracket at all if unset), overridable per run. `config.yaml` ships with `target: ""` — no placeholder IP shipped anymore, so blank input with no config default just aborts with a clear message instead of silently scanning a meaningless example IP. Blank domain displays as N/A and skips subfinder, same as before.
-- `--no-report` flag + an interactive prompt — terminal-output-only is now the default (blank input keeps it); generating PDF/HTML reports requires an explicit `y`
 - `attack_vector` field on findings — Claude names the general exploitation technique/class (not exploit code) for each finding; surfaced as a "Possible Attack Vectors" section in the terminal output (Critical/High only) and in the PDF/HTML detailed findings
 - Parallel scan execution — nmap, web tools, TLS check, and header check all run concurrently via a thread pool (previously sequential)
 - `recon/ssl_headers.py` — pure-Python TLS certificate inspection and HTTP security header checks (no extra binaries needed)
