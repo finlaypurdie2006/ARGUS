@@ -46,7 +46,7 @@ Before scanning, you'll be prompted for target, domain, port range, and report f
 Target IP or hostname to scan [192.168.1.10]: 10.10.11.52
 Domain for subdomain enum, optional [N/A]: 
 Scan all 65535 ports instead of the configured range (1-1000)? [y/N]:
-Generate PDF/HTML reports, or just show terminal output? [reports/terminal] (default: reports):
+Generate PDF/HTML reports as well as terminal output? [y/N] (default: terminal only):
 ```
 Hitting Enter on target/domain keeps whatever's in `config.yaml`; typing something new uses it for that run only (the file itself isn't rewritten). Leaving domain blank shows as N/A and skips subfinder.
 
@@ -56,7 +56,7 @@ Hitting Enter on target/domain keeps whatever's in `config.yaml`; typing somethi
 |---|---|
 | `--skip-web` | Network recon only (skip whatweb/nikto/gobuster/subfinder/TLS/headers) |
 | `--all-ports` | Scan all 65535 ports, skipping the port-range prompt |
-| `--no-report` | Skip the reports-vs-terminal prompt; terminal output only, no PDF/HTML/index |
+| `--no-report` | Skip the reports prompt entirely; terminal output only (same as the default if you just hit Enter) |
 | `--yes` | Skip the target/domain prompts and placeholder-target confirmation; use config.yaml values as-is (for automation/cron) |
 | `--dry-run` | Print the exact commands that would run, without running them |
 | `--quiet` | Suppress per-tool chatter; show only the progress bar + final summary |

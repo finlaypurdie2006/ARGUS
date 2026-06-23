@@ -175,20 +175,19 @@ def main():
         return
 
     # ---------- reports vs terminal-only ----------
-    generate_reports = True
+    generate_reports = False
     if args.no_report:
-        generate_reports = False
         vprint(args.quiet, "[*] --no-report set: terminal output only, no PDF/HTML/index will be generated\n")
     else:
         try:
-            answer = input("Generate PDF/HTML reports, or just show terminal output? [reports/terminal] (default: reports): ").strip().lower()
+            answer = input("Generate PDF/HTML reports as well as terminal output? [y/N] (default: terminal only): ").strip().lower()
         except EOFError:
             answer = ""
-        if answer in ("terminal", "t", "no", "n"):
-            generate_reports = False
-            print("[*] Terminal output only — skipping PDF/HTML/index generation.\n")
-        else:
+        if answer in ("y", "yes"):
+            generate_reports = True
             print("[*] Will generate PDF + HTML reports.\n")
+        else:
+            print("[*] Terminal output only — skipping PDF/HTML/index generation.\n")
 
     # ---------- preflight: warn about missing binaries before scanning ----------
     binary_tasks = {"nmap"} if args.skip_web else BINARY_BACKED
