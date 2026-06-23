@@ -46,7 +46,7 @@ Before scanning, you'll be prompted for AI analysis (first question, before anyt
 Use AI analysis (Claude) to generate findings + reports? [y/N] (default: no): 
 Target IP or hostname to scan: 10.10.11.52
 Domain for subdomain enum, optional [N/A]: 
-Scan all 65535 ports instead of the configured range (1-1000)? [y/N]:
+Scan all 65535 ports instead of the configured range (1-1000)? [y/N] (default: no):
 ```
 
 **The AI question comes first and defaults to no.** Decline it (or just hit Enter) and ARGUS runs with **no `ANTHROPIC_API_KEY` needed at all** — raw nmap/whatweb/nikto/gobuster/TLS/header output prints straight to the terminal: no PDF/HTML, no findings.json, no CVEs/remediation. Say `y` and it analyzes with Claude as before: structured findings, CVEs, attack vectors, and PDF+HTML reports.

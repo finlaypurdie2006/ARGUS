@@ -178,7 +178,7 @@ def main():
         vprint(args.quiet, f"[*] Dry run — using configured port range: {ports}\n")
     else:
         try:
-            answer = input(f"Scan all 65535 ports instead of the configured range ({ports})? [y/N]: ").strip().lower()
+            answer = input(f"Scan all 65535 ports instead of the configured range ({ports})? [y/N] (default: no): ").strip().lower()
         except EOFError:
             answer = "n"
         if answer in ("y", "yes"):
